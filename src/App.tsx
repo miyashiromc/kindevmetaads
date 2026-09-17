@@ -195,8 +195,9 @@ export const App: React.FC = () => {
         status: (isClosed ? 'cerrado' : 'prospecto') as LeadStatus,
         amount: saleAmount,
         createdAt: new Date().toISOString(),
-        saleDate: isClosed ? new Date().toISOString() : undefined,
-        metaEvents: initialEvents
+        source: 'manual' as const,
+        metaEvents: initialEvents,
+        ...(isClosed ? { saleDate: new Date().toISOString() } : {})
       };
 
       if (firestoreConnected) {

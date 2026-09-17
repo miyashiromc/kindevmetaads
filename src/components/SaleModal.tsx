@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, Send, Loader2, Sparkles, Plus, Minus } from 'lucide-react';
 import { Lead } from '../types';
 import { KINDEV_PRESETS } from '../lib/presets';
@@ -52,7 +52,7 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, onClose, onConfirmSa
 
     setLoading(true);
     try {
-      await onConfirmSale(lead.id, finalAmount, note.trim() || undefined);
+      await onConfirmSale(lead.id, finalAmount, note.trim() || '');
       onClose();
     } finally {
       setLoading(false);
