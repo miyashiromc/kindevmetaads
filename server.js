@@ -14,6 +14,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const AUTH_DIR = path.join(__dirname, 'auth_baileys');
 const FIRESTORE_REST_URL = 'https://firestore.googleapis.com/v1/projects/kindevmetaads/databases/(default)/documents/leads';
+const FIRESTORE_STATUS_URL = 'https://firestore.googleapis.com/v1/projects/kindevmetaads/databases/(default)/documents/settings/whatsapp_status';
 
 app.use(cors());
 app.use(express.json());
@@ -36,6 +37,35 @@ let qrCodeDataUrl = '';
 let connectionStatus = 'initializing'; // 'initializing' | 'qr_ready' | 'connected' | 'reconnecting'
 let connectedUser = '';
 let registeredNumbers = new Set();
+
+// Sincronizar estado en vivo con Cloud Firestore
+async function updateFirestoreStatus(status, user = '', note = '') {
+  try {
+    const payload = {
+      fields: {
+        status: { stringValue: status },
+        user: { stringValue: user || '' },
+        note: { stringValue: note || '' },
+        isListening: { booleanValue: status === 'connected' },
+        updatedAt: { stringValue: new Date().toISOString() }
+      }
+    };
+    await fetch(FIRESTORE_STATUS_URL, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+  } catch (err) {
+    // Silencioso
+  }
+}
+
+// Heartbeat periódico cada 20s para informar que el servidor está vivo
+setInterval(() => {
+  if (connectionStatus === 'connected') {
+    updateFirestoreStatus('connected', connectedUser, 'Escuchador activo en segundo plano');
+  }
+}, 20000);
 
 // Iniciar Baileys WhatsApp Socket
 async function startWhatsAppBot() {
@@ -63,6 +93,7 @@ async function startWhatsAppBot() {
         qrCodeDataUrl = await QRCode.toDataURL(qr, { margin: 2, scale: 7 });
         connectionStatus = 'qr_ready';
         console.log('⚡ [WhatsApp] Nuevo código QR generado. Listo para escanear.');
+        updateFirestoreStatus('qr_ready', '', 'Esperando escaneo de código QR');
       } catch (err) {
         console.error('Error generando QR:', err);
       }
@@ -74,10 +105,12 @@ async function startWhatsAppBot() {
       console.log(`⚠️ [WhatsApp] Conexión cerrada. Reconectando: ${shouldReconnect}`);
       connectionStatus = 'reconnecting';
       qrCodeDataUrl = '';
+      updateFirestoreStatus('reconnecting', '', 'Reconectando conexión');
       if (shouldReconnect) {
         setTimeout(startWhatsAppBot, 3000);
       } else {
         connectionStatus = 'initializing';
+        updateFirestoreStatus('disconnected', '', 'Sesión cerrada');
         fs.rmSync(AUTH_DIR, { recursive: true, force: true });
         setTimeout(startWhatsAppBot, 2000);
       }
@@ -88,6 +121,7 @@ async function startWhatsAppBot() {
       const jid = sock.user?.id || '';
       connectedUser = jid.split(':')[0] || 'WhatsApp Business';
       console.log(`📱 [WhatsApp] Conectado como: ${connectedUser}`);
+      updateFirestoreStatus('connected', connectedUser, 'Escuchador activo en segundo plano');
     }
   });
 
@@ -176,8 +210,10 @@ startWhatsAppBot().catch(console.error);
 app.get('/api/whatsapp/status', (req, res) => {
   res.json({
     status: connectionStatus,
+    isListening: connectionStatus === 'connected',
     user: connectedUser,
-    hasQr: Boolean(qrCodeDataUrl)
+    hasQr: Boolean(qrCodeDataUrl),
+    updatedAt: new Date().toISOString()
   });
 });
 

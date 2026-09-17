@@ -1,15 +1,19 @@
 import React from 'react';
-import { FlaskConical, Lock, Database, Radio } from 'lucide-react';
-import { MetaConfig } from '../types';
+import { FlaskConical, Lock, Database, Radio, MessageSquare } from 'lucide-react';
+import { MetaConfig, WhatsAppBotStatus } from '../types';
 import { META_DATASET_ID } from '../lib/meta-capi';
 
 interface HeaderProps {
   config: MetaConfig;
+  wsStatus: WhatsAppBotStatus;
   onOpenConfig: () => void;
+  onOpenWsStatus: () => void;
   onLock: () => void;
 }
 
-export const Header: React.FC<HeaderProps> = ({ config, onOpenConfig, onLock }) => {
+export const Header: React.FC<HeaderProps> = ({ config, wsStatus, onOpenConfig, onOpenWsStatus, onLock }) => {
+  const isWsConnected = wsStatus.isListening && wsStatus.status === 'connected';
+
   return (
     <header className="border-b border-slate-200/80 bg-white/80 backdrop-blur-md sticky top-0 z-40 transition-all">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -44,6 +48,37 @@ export const Header: React.FC<HeaderProps> = ({ config, onOpenConfig, onLock }) 
 
         {/* Acciones */}
         <div className="flex items-center gap-2">
+          {/* Botón Indicador de Escuchador de WhatsApp */}
+          <button
+            type="button"
+            onClick={onOpenWsStatus}
+            className={`text-xs font-semibold flex items-center gap-2 px-3 py-2 rounded-xl transition-all border shadow-sm active:scale-95 ${
+              isWsConnected
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100/90'
+                : wsStatus.status === 'qr_ready'
+                ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100/90'
+                : 'bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border-slate-200 hover:border-rose-200'
+            }`}
+            title="Estado del Escuchador de WhatsApp"
+          >
+            <div className="relative flex items-center justify-center">
+              <span className={`w-2 h-2 rounded-full ${
+                isWsConnected ? 'bg-emerald-500' : wsStatus.status === 'qr_ready' ? 'bg-amber-500' : 'bg-rose-500'
+              }`} />
+              {isWsConnected && (
+                <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping absolute" />
+              )}
+            </div>
+            <MessageSquare className={`w-3.5 h-3.5 ${isWsConnected ? 'text-emerald-600' : 'text-slate-400'}`} />
+            <span className="hidden sm:inline font-bold">
+              {isWsConnected ? 'WhatsApp Activo' : wsStatus.status === 'qr_ready' ? 'Vincular QR' : 'WhatsApp Inactivo'}
+            </span>
+            <span className="sm:hidden font-bold">
+              {isWsConnected ? 'WS Activo' : 'WS Inactivo'}
+            </span>
+          </button>
+
+          {/* Modo Prueba / Producción Meta */}
           <button
             onClick={onOpenConfig}
             className={`text-xs font-semibold flex items-center gap-1.5 px-3 py-2 rounded-xl transition-all border shadow-sm ${
@@ -53,12 +88,14 @@ export const Header: React.FC<HeaderProps> = ({ config, onOpenConfig, onLock }) 
             }`}
           >
             <FlaskConical className={`w-3.5 h-3.5 ${config.testMode ? 'text-amber-600' : 'text-slate-500'}`} />
-            <span>{config.testMode ? `Prueba (${config.testEventCode || 'TEST'})` : 'Modo Producción'}</span>
+            <span className="hidden sm:inline">{config.testMode ? `Prueba (${config.testEventCode || 'TEST'})` : 'Modo Producción'}</span>
+            <span className="sm:hidden">{config.testMode ? 'Prueba' : 'Prod'}</span>
           </button>
 
+          {/* Bloquear sesión */}
           <button
             onClick={onLock}
-            className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-all flex items-center justify-center shadow-sm"
+            className="w-9 h-9 rounded-xl bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200 hover:border-rose-200 transition-all flex items-center justify-center shadow-sm shrink-0"
             title="Bloquear sesión"
           >
             <Lock className="w-4 h-4" />

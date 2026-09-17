@@ -21,8 +21,8 @@ service cloud.firestore {
     // Colección de configuraciones
     match /settings/{docId} {
       allow read: if true;
-      allow write: if docId == 'meta_config' 
-                   && request.resource.data.testMode is bool;
+      allow write: if (docId == 'meta_config' && request.resource.data.testMode is bool)
+                   || docId == 'whatsapp_status';
     }
 
     // Bloqueo total por defecto para cualquier otra colección

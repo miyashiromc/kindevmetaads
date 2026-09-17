@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from './lib/firebase';
-import { Lead, LeadStatus, MetaConfig, DashboardStats, MetaEventRecord } from './types';
+import { Lead, LeadStatus, MetaConfig, DashboardStats, MetaEventRecord, WhatsAppBotStatus } from './types';
 import { dispatchMetaCAPI } from './lib/meta-capi';
 import { SecurityGate } from './components/SecurityGate';
 import { Header } from './components/Header';
@@ -11,6 +11,7 @@ import { LeadForm } from './components/LeadForm';
 import { LeadCard } from './components/LeadCard';
 import { SaleModal } from './components/SaleModal';
 import { ConfigModal } from './components/ConfigModal';
+import { WhatsAppStatusModal } from './components/WhatsAppStatusModal';
 import { Toast, ToastData } from './components/Toast';
 
 const FALLBACK_STORAGE_KEY = 'kindev_leads_cache';
@@ -57,6 +58,12 @@ export const App: React.FC = () => {
   // 4. Modales y Notificaciones
   const [saleLead, setSaleLead] = useState<Lead | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
+  const [isWsModalOpen, setIsWsModalOpen] = useState<boolean>(false);
+  const [wsStatus, setWsStatus] = useState<WhatsAppBotStatus>({
+    status: 'disconnected',
+    isListening: false,
+    user: ''
+  });
   const [toast, setToast] = useState<ToastData | null>(null);
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'info') => {
@@ -117,6 +124,66 @@ export const App: React.FC = () => {
       console.warn('Error inicializando Firestore:', err);
       setFirestoreConnected(false);
     }
+  }, [isUnlocked]);
+
+  // Escuchar estado del WhatsApp Bot (Firestore + Localhost)
+  const refreshWhatsAppStatus = async () => {
+    try {
+      const res = await fetch('http://localhost:3000/api/whatsapp/status', {
+        signal: AbortSignal.timeout(2000)
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setWsStatus({
+          status: data.status,
+          isListening: Boolean(data.isListening),
+          user: data.user || '',
+          hasQr: Boolean(data.hasQr),
+          updatedAt: data.updatedAt || new Date().toISOString()
+        });
+        return;
+      }
+    } catch {
+      // Localhost no alcanzable desde este dispositivo
+    }
+  };
+
+  useEffect(() => {
+    if (!isUnlocked) return;
+
+    // 1. Escucha en tiempo real vía Cloud Firestore (Funciona en tu PC o en tu celular)
+    const statusDoc = doc(db, 'settings', 'whatsapp_status');
+    const unsubscribe = onSnapshot(
+      statusDoc,
+      (snap) => {
+        if (snap.exists()) {
+          const data = snap.data();
+          const lastUpdate = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
+          const isRecent = Date.now() - lastUpdate < 65000;
+          const isConn = data.status === 'connected' && isRecent;
+
+          setWsStatus({
+            status: isConn ? 'connected' : (data.status === 'qr_ready' ? 'qr_ready' : 'disconnected'),
+            isListening: isConn,
+            user: data.user || '',
+            note: data.note || '',
+            updatedAt: data.updatedAt
+          });
+        }
+      },
+      (err) => {
+        console.warn('WhatsApp status snapshot error:', err.message);
+      }
+    );
+
+    // 2. Consulta rápida inmediata al localhost
+    refreshWhatsAppStatus();
+    const interval = setInterval(refreshWhatsAppStatus, 15000);
+
+    return () => {
+      unsubscribe();
+      clearInterval(interval);
+    };
   }, [isUnlocked]);
 
   // Cálculo de KPIs / Estadísticas
@@ -368,7 +435,9 @@ export const App: React.FC = () => {
       {/* Barra de Navegación Superior */}
       <Header
         config={config}
+        wsStatus={wsStatus}
         onOpenConfig={() => setIsConfigOpen(true)}
+        onOpenWsStatus={() => setIsWsModalOpen(true)}
         onLock={handleLock}
       />
 
@@ -583,6 +652,15 @@ export const App: React.FC = () => {
         config={config}
         onClose={() => setIsConfigOpen(false)}
         onSaveConfig={handleSaveConfig}
+        onShowToast={showToast}
+      />
+
+      {/* Modal de Estado de WhatsApp */}
+      <WhatsAppStatusModal
+        isOpen={isWsModalOpen}
+        status={wsStatus}
+        onClose={() => setIsWsModalOpen(false)}
+        onRefresh={refreshWhatsAppStatus}
         onShowToast={showToast}
       />
 

@@ -43,3 +43,13 @@ export interface DashboardStats {
   pendingLeads: number;
   totalLeads: number;
 }
+
+export interface WhatsAppBotStatus {
+  status: 'connected' | 'reconnecting' | 'qr_ready' | 'initializing' | 'disconnected';
+  isListening: boolean;
+  user?: string;
+  note?: string;
+  updatedAt?: string;
+  hasQr?: boolean;
+}
+
