@@ -1,4 +1,4 @@
-export type LeadStatus = 'prospecto' | 'en_negociacion' | 'cerrado' | 'descartado';
+export type LeadStatus = 'prospecto' | 'cotizado' | 'en_negociacion' | 'anticipo' | 'cerrado' | 'descartado';
 
 export interface MetaEventRecord {
   eventName: 'Purchase' | 'Lead' | 'Contact';
@@ -22,6 +22,11 @@ export interface Lead {
   createdAt: string;
   saleDate?: string;
   source?: 'manual' | 'whatsapp_auto';
+  adSource?: string;
+  hostingExpiryDate?: string;
+  domainExpiryDate?: string;
+  lastContactDate?: string;
+  followUpNote?: string;
   metaEvents: MetaEventRecord[];
 }
 
@@ -51,5 +56,35 @@ export interface WhatsAppBotStatus {
   note?: string;
   updatedAt?: string;
   hasQr?: boolean;
+}
+
+export type TabView = 'kanban' | 'analytics' | 'ads_intelligence' | 'ltv_clients' | 'follow_up' | 'quick_list';
+
+export interface AdPerformanceItem {
+  id: string;
+  name: string;
+  format: 'Video Reels' | 'Imagen Carrusel' | 'Imagen Estática' | 'Story';
+  spendUsd: number;
+  clicks: number;
+  leadsCount: number;
+  salesCount: number;
+  revenueUsd: number;
+  roas: number;
+  recommendation: 'scale' | 'optimize' | 'pause';
+  recommendationText: string;
+  status: 'active' | 'learning' | 'paused';
+}
+
+export interface ClientLTVRecord {
+  id: string;
+  clientName: string;
+  phone: string;
+  service: string;
+  initialAmount: number;
+  recurringAnnualUsd: number;
+  hostingStatus: 'active' | 'expiring_soon' | 'expired';
+  daysUntilHostingExpiry: number;
+  upsellOpportunity: string;
+  upsellPotentialUsd: number;
 }
 

@@ -2,10 +2,24 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from './lib/firebase';
-import { Lead, LeadStatus, MetaConfig, DashboardStats, MetaEventRecord, WhatsAppBotStatus } from './types';
+import { 
+  Lead, 
+  LeadStatus, 
+  MetaConfig, 
+  DashboardStats, 
+  MetaEventRecord, 
+  WhatsAppBotStatus,
+  TabView 
+} from './types';
 import { dispatchMetaCAPI } from './lib/meta-capi';
 import { SecurityGate } from './components/SecurityGate';
 import { Header } from './components/Header';
+import { NavigationTabs } from './components/NavigationTabs';
+import { KanbanBoard } from './components/KanbanBoard';
+import { AnalyticsView } from './components/AnalyticsView';
+import { MetaAdsIntelligence } from './components/MetaAdsIntelligence';
+import { LtvClientsView } from './components/LtvClientsView';
+import { FollowUpCenter } from './components/FollowUpCenter';
 import { StatsGrid } from './components/StatsGrid';
 import { LeadForm } from './components/LeadForm';
 import { LeadCard } from './components/LeadCard';
@@ -55,7 +69,10 @@ export const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const LEADS_PER_PAGE = 5;
 
-  // 4. Modales y Notificaciones
+  // 4. Módulo Activo / Pestaña
+  const [activeTab, setActiveTab] = useState<TabView>('kanban');
+
+  // 5. Modales y Notificaciones
   const [saleLead, setSaleLead] = useState<Lead | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
   const [isWsModalOpen, setIsWsModalOpen] = useState<boolean>(false);
@@ -193,7 +210,7 @@ export const App: React.FC = () => {
     const closedLeads = closedList.length;
     const totalRevenue = closedList.reduce((acc, curr) => acc + (curr.amount || 0), 0);
     const pendingLeads = leads.filter(
-      (l) => l.status === 'prospecto' || l.status === 'en_negociacion'
+      (l) => l.status === 'prospecto' || l.status === 'cotizado' || l.status === 'en_negociacion' || l.status === 'anticipo'
     ).length;
 
     return {
@@ -213,7 +230,13 @@ export const App: React.FC = () => {
         lead.service.toLowerCase().includes(searchQuery.toLowerCase());
 
       const matchesStatus =
-        statusFilter === 'all' ? true : lead.status === statusFilter;
+        statusFilter === 'all'
+          ? true
+          : statusFilter === 'prospecto'
+          ? lead.status === 'prospecto' || lead.status === 'cotizado'
+          : statusFilter === 'en_negociacion'
+          ? lead.status === 'en_negociacion' || lead.status === 'anticipo'
+          : lead.status === statusFilter;
 
       return matchesSearch && matchesStatus;
     });
@@ -411,6 +434,29 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleSaveLeadNote = async (leadId: string, note: string) => {
+    try {
+      if (firestoreConnected) {
+        const leadRef = doc(db, 'leads', leadId);
+        await updateDoc(leadRef, {
+          notes: note,
+          lastContactDate: new Date().toISOString()
+        });
+      }
+      const updated = leads.map((l) =>
+        l.id === leadId
+          ? { ...l, notes: note, lastContactDate: new Date().toISOString() }
+          : l
+      );
+      setLeads(updated);
+      localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
+      showToast('Nota de seguimiento guardada con éxito', 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al guardar nota';
+      showToast(msg, 'error');
+    }
+  };
+
   const handleSaveConfig = async (newConfig: MetaConfig, newToken?: string) => {
     setConfig(newConfig);
     localStorage.setItem('kindev_meta_config', JSON.stringify(newConfig));
@@ -466,161 +512,205 @@ export const App: React.FC = () => {
           </div>
         )}
 
-        {/* Métricas / KPIs */}
-        <StatsGrid stats={stats} />
+        {/* Selector de Vistas de la Suite Comercial Kindev */}
+        <NavigationTabs
+          activeTab={activeTab}
+          onSelectTab={(tab) => setActiveTab(tab)}
+          kanbanCount={leads.filter((l) => l.status !== 'descartado').length}
+          closedCount={leads.filter((l) => l.status === 'cerrado').length}
+          followUpCount={leads.filter((l) => ['prospecto', 'cotizado', 'en_negociacion'].includes(l.status)).length}
+        />
 
-        {/* Formulario de Captura Rápida de WhatsApp */}
-        <LeadForm onAddLead={handleAddLead} />
+        {/* 1. Módulo: Pipeline Kanban */}
+        {activeTab === 'kanban' && (
+          <KanbanBoard
+            leads={leads}
+            onUpdateStatus={handleUpdateStatus}
+            onOpenSaleModal={(lead) => setSaleLead(lead)}
+            onAddNewLead={() => setActiveTab('quick_list')}
+          />
+        )}
 
-        {/* Listado y Filtro de Clientes */}
-        <section className="space-y-4">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-            <div>
-              <h3 className="text-lg font-bold text-slate-900 tracking-tight">Gestión de Clientes & Ventas</h3>
-              <p className="text-xs text-slate-500">
-                Total: {filteredLeads.length} {filteredLeads.length === 1 ? 'cliente' : 'clientes'}
-                {totalPages > 1 && ` • Página ${currentPage} de ${totalPages}`}
-              </p>
-            </div>
+        {/* 2. Módulo: Métricas & Gráficos */}
+        {activeTab === 'analytics' && (
+          <AnalyticsView leads={leads} />
+        )}
 
-            {/* Controles de Búsqueda y Filtro */}
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="relative flex-1 sm:w-64">
-                <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                <input
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Buscar por cliente o teléfono..."
-                  className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs placeholder-slate-400 focus:outline-none focus:border-violet-600 shadow-sm"
-                />
-              </div>
+        {/* 3. Módulo: Inteligencia Meta Ads */}
+        {activeTab === 'ads_intelligence' && (
+          <MetaAdsIntelligence leads={leads} />
+        )}
 
-              {/* Selector de filtro */}
-              <div className="flex items-center gap-1 bg-white border border-slate-300 p-1 rounded-xl shadow-sm text-xs font-semibold">
-                <Filter className="w-3.5 h-3.5 text-slate-400 ml-1.5" />
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('all')}
-                  className={`px-2.5 py-1 rounded-lg transition-all ${
-                    statusFilter === 'all'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  Todos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('prospecto')}
-                  className={`px-2.5 py-1 rounded-lg transition-all ${
-                    statusFilter === 'prospecto'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  Prospectos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('en_negociacion')}
-                  className={`px-2.5 py-1 rounded-lg transition-all ${
-                    statusFilter === 'en_negociacion'
-                      ? 'bg-slate-900 text-white'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  Negociación
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setStatusFilter('cerrado')}
-                  className={`px-2.5 py-1 rounded-lg transition-all ${
-                    statusFilter === 'cerrado'
-                      ? 'bg-emerald-600 text-white'
-                      : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
-                  }`}
-                >
-                  Cerrados
-                </button>
-              </div>
-            </div>
-          </div>
+        {/* 4. Módulo: Clientes & LTV */}
+        {activeTab === 'ltv_clients' && (
+          <LtvClientsView leads={leads} />
+        )}
 
-          {/* Listado de Tarjetas */}
-          {filteredLeads.length === 0 ? (
-            <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-10 text-center space-y-3 shadow-sm">
-              <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200 text-slate-400 flex items-center justify-center mx-auto">
-                <Search className="w-5 h-5" />
-              </div>
-              <h4 className="text-sm font-bold text-slate-800">No hay clientes en este filtro</h4>
-              <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Registra un nuevo contacto de WhatsApp en el formulario superior para comenzar a alimentarlo.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 gap-3">
-                {paginatedLeads.map((lead) => (
-                  <LeadCard
-                    key={lead.id}
-                    lead={lead}
-                    onOpenSale={(l) => setSaleLead(l)}
-                    onUpdateStatus={handleUpdateStatus}
-                    onDelete={handleDelete}
-                  />
-                ))}
-              </div>
+        {/* 5. Módulo: Centro de Seguimiento */}
+        {activeTab === 'follow_up' && (
+          <FollowUpCenter leads={leads} onSaveNote={handleSaveLeadNote} />
+        )}
 
-              {/* Barra de Navegación Horizontal (Paginador) */}
-              {totalPages > 1 && (
-                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-sm mt-2">
-                  <div className="text-xs text-slate-500 font-medium">
-                    Mostrando <span className="font-bold text-slate-800">{(currentPage - 1) * LEADS_PER_PAGE + 1}</span> a{' '}
-                    <span className="font-bold text-slate-800">{Math.min(currentPage * LEADS_PER_PAGE, filteredLeads.length)}</span> de{' '}
-                    <span className="font-bold text-slate-800">{filteredLeads.length}</span> clientes
+        {/* 6. Módulo: Lista & Registro Rápido */}
+        {activeTab === 'quick_list' && (
+          <div className="space-y-6">
+            {/* Métricas / KPIs */}
+            <StatsGrid stats={stats} />
+
+            {/* Formulario de Captura Rápida de WhatsApp */}
+            <LeadForm onAddLead={handleAddLead} />
+
+            {/* Listado y Filtro de Clientes */}
+            <section className="space-y-4">
+              <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-lg font-bold text-slate-900 tracking-tight">Gestión de Clientes & Ventas</h3>
+                  <p className="text-xs text-slate-500">
+                    Total: {filteredLeads.length} {filteredLeads.length === 1 ? 'cliente' : 'clientes'}
+                    {totalPages > 1 && ` • Página ${currentPage} de ${totalPages}`}
+                  </p>
+                </div>
+
+                {/* Controles de Búsqueda y Filtro */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <div className="relative flex-1 sm:w-64">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                    <input
+                      type="text"
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      placeholder="Buscar por cliente o teléfono..."
+                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs placeholder-slate-400 focus:outline-none focus:border-violet-600 shadow-sm"
+                    />
                   </div>
-                  <div className="flex items-center gap-1.5">
+
+                  {/* Selector de filtro */}
+                  <div className="flex items-center gap-1 bg-white border border-slate-300 p-1 rounded-xl shadow-sm text-xs font-semibold">
+                    <Filter className="w-3.5 h-3.5 text-slate-400 ml-1.5" />
                     <button
                       type="button"
-                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
-                      disabled={currentPage === 1}
-                      className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 text-xs font-bold text-slate-700 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                      onClick={() => setStatusFilter('all')}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        statusFilter === 'all'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
                     >
-                      <ChevronLeft className="w-4 h-4" />
-                      <span>Anterior</span>
+                      Todos
                     </button>
-                    <div className="flex items-center gap-1">
-                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                        <button
-                          key={page}
-                          type="button"
-                          onClick={() => setCurrentPage(page)}
-                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
-                            currentPage === page
-                              ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
-                              : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
-                          }`}
-                        >
-                          {page}
-                        </button>
-                      ))}
-                    </div>
                     <button
                       type="button"
-                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
-                      disabled={currentPage === totalPages}
-                      className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 text-xs font-bold text-slate-700 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                      onClick={() => setStatusFilter('prospecto')}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        statusFilter === 'prospecto'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
                     >
-                      <span>Siguiente</span>
-                      <ChevronRight className="w-4 h-4" />
+                      Prospectos
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter('en_negociacion')}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        statusFilter === 'en_negociacion'
+                          ? 'bg-slate-900 text-white'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      Negociación
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setStatusFilter('cerrado')}
+                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                        statusFilter === 'cerrado'
+                          ? 'bg-emerald-600 text-white'
+                          : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
+                      }`}
+                    >
+                      Cerrados
                     </button>
                   </div>
                 </div>
-              )}
-            </>
-          )}
-        </section>
+              </div>
+
+              {/* Listado de Tarjetas */}
+              {filteredLeads.length === 0 ? (
+                <div className="bg-white border border-dashed border-slate-300 rounded-2xl p-10 text-center space-y-3 shadow-sm">
+                  <div className="w-12 h-12 rounded-2xl bg-slate-50 border border-slate-200 text-slate-400 flex items-center justify-center mx-auto">
+                    <Search className="w-5 h-5" />
+                  </div>
+                  <h4 className="text-sm font-bold text-slate-800">No hay clientes en este filtro</h4>
+                  <p className="text-xs text-slate-500 max-w-sm mx-auto">
+                    Registra un nuevo contacto de WhatsApp en el formulario superior para comenzar a alimentarlo.
+                  </p>
+                </div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 gap-3">
+                    {paginatedLeads.map((lead) => (
+                      <LeadCard
+                        key={lead.id}
+                        lead={lead}
+                        onOpenSale={(l) => setSaleLead(l)}
+                        onUpdateStatus={handleUpdateStatus}
+                        onDelete={handleDelete}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Barra de Navegación Horizontal (Paginador) */}
+                  {totalPages > 1 && (
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-sm mt-2">
+                      <div className="text-xs text-slate-500 font-medium">
+                        Mostrando <span className="font-bold text-slate-800">{(currentPage - 1) * LEADS_PER_PAGE + 1}</span> a{' '}
+                        <span className="font-bold text-slate-800">{Math.min(currentPage * LEADS_PER_PAGE, filteredLeads.length)}</span> de{' '}
+                        <span className="font-bold text-slate-800">{filteredLeads.length}</span> clientes
+                      </div>
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                          className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 text-xs font-bold text-slate-700 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                        >
+                          <ChevronLeft className="w-4 h-4" />
+                          <span>Anterior</span>
+                        </button>
+                        <div className="flex items-center gap-1">
+                          {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                            <button
+                              key={page}
+                              type="button"
+                              onClick={() => setCurrentPage(page)}
+                              className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
+                                currentPage === page
+                                ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
+                                : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                            }`}
+                          >
+                            {page}
+                          </button>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                        disabled={currentPage === totalPages}
+                        className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 text-xs font-bold text-slate-700 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                      >
+                        <span>Siguiente</span>
+                        <ChevronRight className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+          </section>
+        </div>
+      )}
 
       </main>
 

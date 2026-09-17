@@ -6,7 +6,7 @@ service cloud.firestore {
     function isValidLead(data) {
       return data.name is string && data.name.size() <= 100
           && data.phone is string && data.phone.size() <= 20
-          && data.status in ['prospecto', 'en_negociacion', 'cerrado', 'descartado']
+          && data.status in ['prospecto', 'cotizado', 'en_negociacion', 'anticipo', 'cerrado', 'descartado']
           && data.amount is number && data.amount >= 0;
     }
 

@@ -22,11 +22,25 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
             Cerrado (${Number(lead.amount).toFixed(2)})
           </span>
         );
+      case 'anticipo':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-700 border border-violet-200">
+            <Clock className="w-3.5 h-3.5 text-violet-600" />
+            Pagó Anticipo (${Number(lead.amount).toFixed(2)})
+          </span>
+        );
       case 'en_negociacion':
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
             <Clock className="w-3.5 h-3.5 text-amber-600" />
             En Negociación {lead.amount > 0 ? `($${Number(lead.amount).toFixed(2)})` : ''}
+          </span>
+        );
+      case 'cotizado':
+        return (
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+            <Clock className="w-3.5 h-3.5 text-blue-600" />
+            Cotizado {lead.amount > 0 ? `($${Number(lead.amount).toFixed(2)})` : ''}
           </span>
         );
       case 'descartado':
@@ -134,7 +148,9 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
           className="bg-slate-50 border border-slate-300 text-slate-700 text-xs font-semibold rounded-xl px-3 py-2 focus:outline-none focus:border-violet-600 cursor-pointer transition-all"
         >
           <option value="prospecto">Prospecto</option>
+          <option value="cotizado">Cotizado</option>
           <option value="en_negociacion">Negociación</option>
+          <option value="anticipo">Anticipo</option>
           <option value="cerrado">Cerrado</option>
           <option value="descartado">Descartado</option>
         </select>
