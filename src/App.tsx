@@ -518,6 +518,7 @@ export const App: React.FC = () => {
         config={config}
         onClose={() => setIsConfigOpen(false)}
         onSaveConfig={handleSaveConfig}
+        onShowToast={showToast}
       />
 
       {/* Notificaciones Toast */}

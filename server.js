@@ -1,248 +1,133 @@
-import express from 'express';
+﻿import express from 'express';
 import cors from 'cors';
-import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { sendMetaConversion, getMetaCredentials, formatPhoneNumber } from './lib/meta-capi.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const DB_FILE = path.join(__dirname, 'data', 'leads.json');
+const WEBHOOK_VERIFY_TOKEN = process.env.WEBHOOK_VERIFY_TOKEN || 'kindev_meta_webhook_2026';
+const FIRESTORE_REST_URL = 'https://firestore.googleapis.com/v1/projects/kindevmetaads/databases/(default)/documents/leads';
 
 app.use(cors());
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'dist')));
 
-// Helper para leer la base de datos local
-function readDb() {
-  try {
-    if (!fs.existsSync(DB_FILE)) {
-      const initial = { config: { testMode: false, testEventCode: '' }, leads: [] };
-      fs.writeFileSync(DB_FILE, JSON.stringify(initial, null, 2));
-      return initial;
-    }
-    const data = fs.readFileSync(DB_FILE, 'utf8');
-    return JSON.parse(data);
-  } catch (err) {
-    console.error('Error leyendo leads.json:', err);
-    return { config: { testMode: false, testEventCode: '' }, leads: [] };
+// Helper para formatear celular ecuatoriano
+function cleanPhone(raw) {
+  if (!raw) return '';
+  let phone = String(raw).replace(/\D/g, '');
+  if (phone.startsWith('09') && phone.length === 10) {
+    phone = '593' + phone.slice(1);
+  } else if (phone.length === 9 && phone.startsWith('9')) {
+    phone = '593' + phone;
   }
+  return phone;
 }
 
-// Helper para escribir en la base de datos local
-function writeDb(data) {
-  try {
-    fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-  } catch (err) {
-    console.error('Error escribiendo leads.json:', err);
+// 1. Verificación de Webhook para Meta (Facebook Developers)
+app.get('/api/webhook/whatsapp', (req, res) => {
+  const mode = req.query['hub.mode'];
+  const token = req.query['hub.verify_token'];
+  const challenge = req.query['hub.challenge'];
+
+  if (mode === 'subscribe' && token === WEBHOOK_VERIFY_TOKEN) {
+    console.log('✅ Webhook de Meta verificado con éxito!');
+    return res.status(200).send(challenge);
   }
-}
-
-// 1. Obtener lista de prospectos y métricas globales
-app.get('/api/leads', (req, res) => {
-  const db = readDb();
-  const leads = db.leads || [];
-
-  const totalLeads = leads.length;
-  const closedLeads = leads.filter(l => l.status === 'cerrado').length;
-  const pendingLeads = leads.filter(l => l.status !== 'cerrado' && l.status !== 'descartado').length;
-  const totalRevenue = leads
-    .filter(l => l.status === 'cerrado')
-    .reduce((acc, curr) => acc + (Number(curr.amount) || 0), 0);
-
-  res.json({
-    stats: {
-      totalLeads,
-      closedLeads,
-      pendingLeads,
-      totalRevenue
-    },
-    config: db.config,
-    leads: leads.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))
-  });
+  console.warn('❌ Intento fallido de verificación de Webhook:', { mode, token });
+  return res.sendStatus(403);
 });
 
-// 2. Registrar un nuevo prospecto de WhatsApp
-app.post('/api/leads', async (req, res) => {
+// 2. Ingesta de Mensajes de WhatsApp (Meta Cloud API o Formato Universal)
+app.post('/api/webhook/whatsapp', async (req, res) => {
   try {
-    const { name, phone, email, notes, service, sendLeadEvent } = req.body;
+    const body = req.body;
+    let senderName = 'Cliente WhatsApp';
+    let rawPhone = '';
+    let messageText = '';
 
-    if (!phone) {
-      return res.status(400).json({ error: 'El número de teléfono es obligatorio.' });
+    // Caso A: Formato Oficial de Meta WhatsApp Cloud API
+    if (body.entry && body.entry[0]?.changes && body.entry[0]?.changes[0]?.value) {
+      const changeVal = body.entry[0].changes[0].value;
+      const contact = changeVal.contacts?.[0];
+      const message = changeVal.messages?.[0];
+
+      if (!message) {
+        // Notificación de estado (delivered, read, etc.), responder 200 OK
+        return res.status(200).json({ status: 'ignored_status_update' });
+      }
+
+      senderName = contact?.profile?.name || 'Cliente WhatsApp';
+      rawPhone = message?.from || '';
+      messageText = message?.text?.body || message?.type || 'Mensaje de WhatsApp';
+    } 
+    // Caso B: Formato Universal (Zapier, Make, ManyChat, QR Gateways)
+    else if (body.phone || body.from) {
+      rawPhone = body.phone || body.from;
+      senderName = body.name || body.sender || 'Cliente WhatsApp';
+      messageText = body.message || body.text || '';
+    } else {
+      return res.status(400).json({ error: 'Formato de payload no reconocido' });
     }
 
-    const db = readDb();
-    const cleanPhone = formatPhoneNumber(phone);
+    const phone = cleanPhone(rawPhone);
+    if (!phone) {
+      return res.status(400).json({ error: 'Número de teléfono no válido' });
+    }
 
-    const newLead = {
-      id: `kd_${Date.now()}_${Math.random().toString(36).substr(2, 4)}`,
-      name: name?.trim() || 'Cliente WhatsApp',
-      phone: cleanPhone,
-      displayPhone: phone.trim(),
-      email: email?.trim() || '',
-      service: service || 'Web Corporativa Base ($120)',
-      notes: notes?.trim() || '',
-      status: 'prospecto', // 'prospecto' | 'en_negociacion' | 'cerrado' | 'descartado'
-      amount: 0,
-      createdAt: new Date().toISOString(),
-      metaEvents: []
+    // Insertar en Cloud Firestore vía REST API
+    const firestorePayload = {
+      fields: {
+        name: { stringValue: senderName },
+        phone: { stringValue: phone },
+        displayPhone: { stringValue: rawPhone },
+        service: { stringValue: 'Contacto Inicial WhatsApp' },
+        notes: { stringValue: messageText ? `Mensaje: "${messageText}"` : 'Auto-registrado desde WhatsApp' },
+        status: { stringValue: 'prospecto' },
+        amount: { doubleValue: 0 },
+        createdAt: { stringValue: new Date().toISOString() },
+        source: { stringValue: 'whatsapp_auto' }
+      }
     };
 
-    // Si se activó enviar evento de Lead a Meta en el registro
-    if (sendLeadEvent) {
-      try {
-        const testCode = db.config?.testMode ? db.config?.testEventCode : undefined;
-        const capiRes = await sendMetaConversion({
-          eventName: 'Lead',
-          phone: cleanPhone,
-          email: newLead.email,
-          name: newLead.name,
-          testEventCode: testCode
-        });
+    const response = await fetch(FIRESTORE_REST_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(firestorePayload)
+    });
 
-        newLead.metaEvents.push({
-          eventName: 'Lead',
-          date: new Date().toISOString(),
-          fbtraceId: capiRes.fbtraceId,
-          testMode: !!testCode
-        });
-      } catch (metaErr) {
-        console.warn('Aviso: No se pudo despachar evento Lead inicial a Meta:', metaErr.message);
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Error insertando en Firestore REST:', errText);
+      return res.status(500).json({ error: 'Error guardando en Firestore', detail: errText });
+    }
+
+    const docResult = await response.json();
+    console.log(`⚡ Lead auto-capturado con éxito: ${senderName} (${phone})`);
+
+    return res.status(200).json({
+      status: 'success',
+      lead: {
+        name: senderName,
+        phone,
+        docName: docResult.name
       }
-    }
+    });
 
-    db.leads.push(newLead);
-    writeDb(db);
-
-    res.status(201).json({ success: true, lead: newLead });
-  } catch (error) {
-    console.error('Error al crear lead:', error);
-    res.status(500).json({ error: error.message });
+  } catch (err) {
+    console.error('Error en /api/webhook/whatsapp:', err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
-// 3. Registrar una VENTA CERRADA y despachar Purchase a Meta CAPI
-app.post('/api/leads/:id/sale', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { amount, notes } = req.body;
-
-    const saleAmount = Number(amount);
-    if (!saleAmount || saleAmount <= 0) {
-      return res.status(400).json({ error: 'El monto de la venta debe ser mayor a 0.' });
-    }
-
-    const db = readDb();
-    const leadIndex = db.leads.findIndex(l => l.id === id);
-
-    if (leadIndex === -1) {
-      return res.status(404).json({ error: 'Prospecto no encontrado.' });
-    }
-
-    const lead = db.leads[leadIndex];
-    lead.status = 'cerrado';
-    lead.amount = saleAmount;
-    lead.saleDate = new Date().toISOString();
-    if (notes) lead.notes = (lead.notes ? `${lead.notes} | ` : '') + notes;
-
-    // Despachar a Meta CAPI
-    const testCode = db.config?.testMode ? db.config?.testEventCode : undefined;
-    const capiResult = await sendMetaConversion({
-      eventName: 'Purchase',
-      phone: lead.phone,
-      email: lead.email,
-      name: lead.name,
-      value: saleAmount,
-      currency: 'USD',
-      testEventCode: testCode
-    });
-
-    lead.metaEvents = lead.metaEvents || [];
-    lead.metaEvents.push({
-      eventName: 'Purchase',
-      amount: saleAmount,
-      currency: 'USD',
-      date: new Date().toISOString(),
-      fbtraceId: capiResult.fbtraceId,
-      testMode: !!testCode
-    });
-
-    writeDb(db);
-
-    res.json({
-      success: true,
-      message: `¡Venta de $${saleAmount} USD enviada exitosamente a Meta CAPI!`,
-      lead,
-      capiResult
-    });
-  } catch (error) {
-    console.error('Error al registrar venta:', error);
-    res.status(500).json({ error: error.message });
-  }
+// Redirigir cualquier otra ruta a la SPA
+app.get('*', (req, res) => {
+  res.sendFile(path.join(__dirname, 'dist', 'index.html'));
 });
 
-// 4. Cambiar estado de un prospecto
-app.patch('/api/leads/:id/status', (req, res) => {
-  const { id } = req.params;
-  const { status } = req.body;
-
-  const validStatuses = ['prospecto', 'en_negociacion', 'cerrado', 'descartado'];
-  if (!validStatuses.includes(status)) {
-    return res.status(400).json({ error: 'Estado no válido.' });
-  }
-
-  const db = readDb();
-  const lead = db.leads.find(l => l.id === id);
-  if (!lead) return res.status(404).json({ error: 'Prospecto no encontrado.' });
-
-  lead.status = status;
-  writeDb(db);
-
-  res.json({ success: true, lead });
-});
-
-// 5. Eliminar un prospecto
-app.delete('/api/leads/:id', (req, res) => {
-  const { id } = req.params;
-  const db = readDb();
-  db.leads = db.leads.filter(l => l.id !== id);
-  writeDb(db);
-  res.json({ success: true, message: 'Prospecto eliminado.' });
-});
-
-// 6. Obtener configuración actual
-app.get('/api/config', (req, res) => {
-  const db = readDb();
-  const creds = getMetaCredentials();
-  res.json({
-    datasetId: creds.datasetId,
-    hasToken: !!creds.accessToken,
-    firebaseProject: 'kindevmetaads',
-    config: db.config || { testMode: false, testEventCode: '' }
-  });
-});
-
-// 7. Actualizar configuración (Modo Test / Código de prueba)
-app.post('/api/config', (req, res) => {
-  const { testMode, testEventCode } = req.body;
-  const db = readDb();
-  db.config = {
-    testMode: !!testMode,
-    testEventCode: testEventCode?.trim() || ''
-  };
-  writeDb(db);
-  res.json({ success: true, config: db.config });
-});
-
-// Iniciar servidor
 app.listen(PORT, () => {
-  console.log(`\n==================================================`);
-  console.log(`🚀 Kindev Meta Ads CAPI Dashboard en ejecución`);
-  console.log(`🌐 Acceso local:   http://localhost:${PORT}`);
-  console.log(`📁 Proyecto Firebase: kindevmetaads`);
-  console.log(`🔑 Dataset ID:     ${getMetaCredentials().datasetId}`);
-  console.log(`==================================================\n`);
+  console.log(`Servidor CAPI & Webhook activo en puerto ${PORT}`);
 });

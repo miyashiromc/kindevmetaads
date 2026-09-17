@@ -1,4 +1,4 @@
-﻿import React from 'react';
+import React from 'react';
 import { MessageCircle, DollarSign, Trash2, CheckCircle, Clock, User, XCircle, Edit3 } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
 
@@ -60,6 +60,11 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
         <div className="flex items-center gap-2.5 flex-wrap">
           <h4 className="font-bold text-slate-900 text-base">{lead.name}</h4>
           {getStatusBadge()}
+          {lead.source === 'whatsapp_auto' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+              ⚡ Auto-WhatsApp
+            </span>
+          )}
         </div>
 
         <div className="flex items-center gap-3 text-xs text-slate-500 flex-wrap">

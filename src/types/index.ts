@@ -21,6 +21,7 @@ export interface Lead {
   amount: number;
   createdAt: string;
   saleDate?: string;
+  source?: 'manual' | 'whatsapp_auto';
   metaEvents: MetaEventRecord[];
 }
 
