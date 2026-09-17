@@ -10,3 +10,4 @@ build/
 
 # Client PII and local DB
 data/leads.json
+*.tsbuildinfo
