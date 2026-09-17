@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="es" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Kindev Meta CAPI — Despachador de Ventas & Leads</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              purple: '#7c3aed',
+              cyan: '#06b6d4',
+              emerald: '#10b981',
+              dark: '#09090b',
+              surface: '#18181b',
+              border: '#27272a'
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- Firebase SDK Compat via CDN -->
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+</head>
+<body class="bg-zinc-950 text-zinc-100 font-sans min-h-screen antialiased selection:bg-brand-purple selection:text-white pb-12">
+
+  <!-- SECURITY GATE / BLOQUEO POR PIN -->
+  <div id="securityGate" class="fixed inset-0 z-50 bg-zinc-950/95 backdrop-blur-xl flex items-center justify-center p-4">
+    <div class="max-w-sm w-full p-6 rounded-3xl bg-zinc-900 border border-zinc-800 text-center space-y-5 shadow-2xl animate-fade-in relative">
+      <div class="w-14 h-14 mx-auto rounded-2xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-400 flex items-center justify-center font-black text-white text-2xl shadow-xl shadow-violet-600/30">
+        K
+      </div>
+      <div>
+        <h2 class="text-lg font-bold text-white tracking-tight">Kindev Meta Ads</h2>
+        <p class="text-xs text-zinc-400 mt-1">Acceso restringido. Ingresa tu PIN de seguridad.</p>
+      </div>
+
+      <form id="pinForm" class="space-y-3">
+        <div>
+          <input type="password" id="inputPin" placeholder="••••••••" maxlength="20" required autofocus
+                 class="w-full text-center tracking-widest text-lg px-4 py-3 rounded-xl bg-zinc-950 border border-zinc-800 text-white placeholder-zinc-700 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 font-mono">
+        </div>
+        <p id="pinError" class="text-xs text-rose-400 hidden"><i class="fa-solid fa-circle-exclamation mr-1"></i> PIN incorrecto</p>
+        <button type="submit" class="w-full py-3 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 active:scale-95 text-white font-bold text-sm shadow-lg shadow-violet-600/20 transition-all flex items-center justify-center gap-2">
+          <i class="fa-solid fa-lock-open"></i>
+          <span>Desbloquear Dashboard</span>
+        </button>
+      </form>
+      <div class="text-[10px] text-zinc-600 font-mono">PIN por defecto: kindev2026</div>
+    </div>
+  </div>
+
+  <!-- DASHBOARD PRINCIPAL (OCULTO HASTA AUTENTICARSE) -->
+  <div id="appContainer" class="hidden">
+    <!-- Navbar / Header Superior -->
+    <header class="border-b border-zinc-800/80 bg-zinc-900/50 backdrop-blur-md sticky top-0 z-40">
+      <div class="max-w-6xl mx-auto px-4 py-3.5 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-9 h-9 rounded-xl bg-gradient-to-tr from-violet-600 via-indigo-600 to-cyan-400 flex items-center justify-center font-black text-white text-lg shadow-lg shadow-violet-600/20">
+            K
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="font-bold tracking-tight text-white text-base">Kindev Meta Ads</h1>
+              <span class="text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full bg-cyan-500/10 text-cyan-400 border border-cyan-500/30">CAPI ENGINE</span>
+              <span class="text-[10px] font-semibold tracking-wider px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 flex items-center gap-1">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                FIRESTORE CLOUD
+              </span>
+            </div>
+            <p class="text-xs text-zinc-400">Firebase: <span class="text-zinc-300 font-mono">kindevmetaads</span> • Dataset: <span id="headerDatasetId" class="text-zinc-300 font-mono">1368429478371391</span></p>
+          </div>
+        </div>
+
+        <!-- Opciones Header -->
+        <div class="flex items-center gap-2">
+          <button id="btnOpenConfig" class="text-xs flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-300 transition-colors border border-zinc-700/60">
+            <i class="fa-solid fa-flask text-violet-400"></i>
+            <span id="configModeBadge">Modo Producción</span>
+          </button>
+          <button id="btnLockApp" class="w-8 h-8 rounded-lg bg-zinc-800/80 hover:bg-zinc-700 text-zinc-400 hover:text-rose-400 border border-zinc-700/60 transition-colors flex items-center justify-center text-xs" title="Bloquear Sesión">
+            <i class="fa-solid fa-lock"></i>
+          </button>
+        </div>
+      </div>
+    </header>
+
+    <!-- Contenedor Principal -->
+    <main class="max-w-6xl mx-auto px-4 py-6 space-y-6">
+
+      <!-- KPI Stats Cards (Estética Ergonómica Kindev) -->
+      <section class="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
+        <div class="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 relative overflow-hidden">
+          <div class="text-xs font-medium text-zinc-400 mb-1 flex items-center justify-between">
+            <span>Facturación Meta</span>
+            <i class="fa-solid fa-dollar-sign text-emerald-400"></i>
+          </div>
+          <div id="statRevenue" class="text-2xl md:text-3xl font-extrabold text-emerald-400 tracking-tight">$0.00</div>
+          <div class="text-[11px] text-zinc-500 mt-1">Enviado a Meta CAPI</div>
+          <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-emerald-500/5 rounded-full blur-xl pointer-events-none"></div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 relative overflow-hidden">
+          <div class="text-xs font-medium text-zinc-400 mb-1 flex items-center justify-between">
+            <span>Ventas Cerradas</span>
+            <i class="fa-solid fa-circle-check text-cyan-400"></i>
+          </div>
+          <div id="statClosed" class="text-2xl md:text-3xl font-extrabold text-cyan-400 tracking-tight">0</div>
+          <div class="text-[11px] text-zinc-500 mt-1">Eventos `Purchase`</div>
+          <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-cyan-500/5 rounded-full blur-xl pointer-events-none"></div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 relative overflow-hidden">
+          <div class="text-xs font-medium text-zinc-400 mb-1 flex items-center justify-between">
+            <span>En Negociación</span>
+            <i class="fa-solid fa-comments text-amber-400"></i>
+          </div>
+          <div id="statPending" class="text-2xl md:text-3xl font-extrabold text-amber-400 tracking-tight">0</div>
+          <div class="text-[11px] text-zinc-500 mt-1">Prospectos activos</div>
+          <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-amber-500/5 rounded-full blur-xl pointer-events-none"></div>
+        </div>
+
+        <div class="p-4 rounded-2xl bg-zinc-900/60 border border-zinc-800/80 relative overflow-hidden">
+          <div class="text-xs font-medium text-zinc-400 mb-1 flex items-center justify-between">
+            <span>Total Leads</span>
+            <i class="fa-solid fa-users text-violet-400"></i>
+          </div>
+          <div id="statTotal" class="text-2xl md:text-3xl font-extrabold text-violet-400 tracking-tight">0</div>
+          <div class="text-[11px] text-zinc-500 mt-1">Contactos registrados</div>
+          <div class="absolute -right-4 -bottom-4 w-16 h-16 bg-violet-500/5 rounded-full blur-xl pointer-events-none"></div>
+        </div>
+      </section>
+
+      <!-- Sección de Registro Rápido (Diseño Limpio, Sin Box-in-Box) -->
+      <section class="p-5 md:p-6 rounded-2xl bg-zinc-900/40 border border-zinc-800/80">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-white flex items-center gap-2">
+              <i class="fa-brands fa-whatsapp text-emerald-400 text-xl"></i>
+              Registrar Cliente de WhatsApp
+            </h2>
+            <p class="text-xs text-zinc-400">Anota al prospecto cuando te escriba. Al cerrar la venta, un solo toque entrena a Meta.</p>
+          </div>
+        </div>
+
+        <form id="newLeadForm" class="grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-zinc-400 mb-1">Nombre del Cliente</label>
+            <input type="text" id="inputName" placeholder="Ej. Juan Pérez" required maxlength="100"
+                   class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 text-sm">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-400 mb-1">Teléfono (WhatsApp)</label>
+            <input type="text" id="inputPhone" placeholder="0991234567 o +593..." required maxlength="20"
+                   class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white placeholder-zinc-600 focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 text-sm font-mono">
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-zinc-400 mb-1">Servicio de Interés</label>
+            <select id="inputService" class="w-full px-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white focus:outline-none focus:border-violet-500 focus:ring-1 focus:ring-violet-500 text-sm">
+              <option value="Landing Page Express ($60)">Landing Page Express ($60 USD)</option>
+              <option value="Web Corporativa Base ($120)" selected>Web Corporativa Base ($120 USD)</option>
+              <option value="Web Corporativa Pro ($260)">Web Corporativa Pro ($260 USD)</option>
+              <option value="Plataforma Web SaaS ($400+)">Plataforma Web SaaS ($400+ USD)</option>
+              <option value="E-commerce ($600+)">E-commerce ($600+ USD)</option>
+              <option value="App Móvil ($800+)">App Móvil ($800+ USD)</option>
+              <option value="Otro Servicio">Otro / Personalizado</option>
+            </select>
+          </div>
+
+          <div class="flex items-end gap-2">
+            <button type="submit" class="w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-sm shadow-lg shadow-violet-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+              <i class="fa-solid fa-user-plus"></i>
+              <span>Guardar Lead</span>
+            </button>
+          </div>
+        </form>
+      </section>
+
+      <!-- Lista de Prospectos & Cierre de Ventas -->
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <span>Gestión de Prospectos</span>
+            <span id="leadCountBadge" class="text-xs px-2 py-0.5 rounded-full bg-zinc-800 text-zinc-400">0</span>
+          </h3>
+          <button id="btnRefresh" class="text-xs text-zinc-400 hover:text-white flex items-center gap-1.5 px-2.5 py-1 rounded-lg hover:bg-zinc-900 transition-colors">
+            <i class="fa-solid fa-rotate-right"></i>
+            <span>Actualizar</span>
+          </button>
+        </div>
+
+        <div id="leadsList" class="space-y-2.5">
+          <div class="text-center py-12 text-zinc-500">
+            <i class="fa-solid fa-spinner fa-spin text-2xl mb-2 text-violet-500"></i>
+            <p class="text-xs">Cargando prospectos en vivo...</p>
+          </div>
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Modal para Registrar Venta (Tarifas Oficiales Kindev 2026) -->
+    <div id="modalSale" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full p-6 space-y-5 shadow-2xl relative">
+        <button id="btnCloseModal" class="absolute top-4 right-4 text-zinc-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div>
+          <div class="w-10 h-10 rounded-xl bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-xl mb-2">
+            <i class="fa-solid fa-badge-check"></i>
+          </div>
+          <h3 class="text-lg font-bold text-white">Marcar Venta & Enviar a Meta</h3>
+          <p class="text-xs text-zinc-400 mt-0.5">Cliente: <span id="modalClientName" class="font-semibold text-white"></span> (<span id="modalClientPhone" class="font-mono text-zinc-300"></span>)</p>
+        </div>
+
+        <!-- Presets de Tarifas Kindev 2026 -->
+        <div class="space-y-2">
+          <label class="block text-xs font-semibold text-zinc-400 uppercase tracking-wider">Tarifas Oficiales Kindev (1 toque)</label>
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" class="btn-preset px-3 py-2.5 rounded-xl border border-zinc-800 bg-zinc-950 hover:border-emerald-500 text-left transition-all group" data-amount="60">
+              <div class="text-xs text-zinc-400 group-hover:text-zinc-300">Landing Express</div>
+              <div class="text-base font-bold text-emerald-400">$60 USD</div>
+            </button>
+            <button type="button" class="btn-preset px-3 py-2.5 rounded-xl border border-zinc-800 bg-zinc-950 hover:border-emerald-500 text-left transition-all group" data-amount="120">
+              <div class="text-xs text-zinc-400 group-hover:text-zinc-300">Web Corp. Base</div>
+              <div class="text-base font-bold text-emerald-400">$120 USD</div>
+            </button>
+            <button type="button" class="btn-preset px-3 py-2.5 rounded-xl border border-zinc-800 bg-zinc-950 hover:border-emerald-500 text-left transition-all group" data-amount="260">
+              <div class="text-xs text-zinc-400 group-hover:text-zinc-300">Web Corp. Pro</div>
+              <div class="text-base font-bold text-emerald-400">$260 USD</div>
+            </button>
+            <button type="button" class="btn-preset px-3 py-2.5 rounded-xl border border-zinc-800 bg-zinc-950 hover:border-emerald-500 text-left transition-all group" data-amount="400">
+              <div class="text-xs text-zinc-400 group-hover:text-zinc-300">Plataforma Base</div>
+              <div class="text-base font-bold text-emerald-400">$400 USD</div>
+            </button>
+          </div>
+        </div>
+
+        <!-- Monto Personalizado -->
+        <div>
+          <label class="block text-xs font-medium text-zinc-400 mb-1">O escribe otro monto ($ USD)</label>
+          <div class="relative">
+            <span class="absolute left-3.5 top-2.5 text-zinc-500 font-bold">$</span>
+            <input type="number" id="inputCustomAmount" placeholder="120.00" step="0.01" min="1"
+                   class="w-full pl-8 pr-3.5 py-2.5 rounded-xl bg-zinc-950 border border-zinc-800 text-white font-mono text-base font-bold focus:outline-none focus:border-emerald-500">
+          </div>
+        </div>
+
+        <!-- Botón de Confirmación -->
+        <button id="btnConfirmSale" class="w-full py-3 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-bold text-sm shadow-lg shadow-emerald-600/20 transition-all active:scale-[0.98] flex items-center justify-center gap-2">
+          <i class="fa-solid fa-paper-plane"></i>
+          <span>Enviar Purchase a Meta CAPI</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Modal de Configuración & Seguridad -->
+    <div id="modalConfig" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
+      <div class="bg-zinc-900 border border-zinc-800 rounded-2xl max-w-md w-full p-6 space-y-4 shadow-2xl relative">
+        <button id="btnCloseConfig" class="absolute top-4 right-4 text-zinc-400 hover:text-white text-lg">
+          <i class="fa-solid fa-xmark"></i>
+        </button>
+
+        <div>
+          <h3 class="text-base font-bold text-white flex items-center gap-2">
+            <i class="fa-solid fa-shield-halved text-violet-400"></i>
+            Seguridad & Meta CAPI
+          </h3>
+          <p class="text-xs text-zinc-400 mt-1">Credenciales encriptadas y modo de prueba.</p>
+        </div>
+
+        <!-- Token de Acceso (Enmascarado) -->
+        <div class="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800/80 space-y-2">
+          <div class="flex items-center justify-between">
+            <label class="text-xs font-semibold text-zinc-300">Token de Acceso Meta (CAPI)</label>
+            <span class="text-[10px] text-emerald-400 font-mono"><i class="fa-solid fa-lock text-[9px]"></i> Almacenado localmente</span>
+          </div>
+          <div class="relative">
+            <input type="password" id="inputMetaToken" placeholder="EAAPkg..." 
+                   class="w-full px-3 py-2 pr-9 rounded-lg bg-zinc-900 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-violet-500">
+            <button type="button" id="btnToggleToken" class="absolute right-2.5 top-2.5 text-zinc-500 hover:text-zinc-300 text-xs">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+          </div>
+        </div>
+
+        <!-- Modo Prueba -->
+        <div class="p-3.5 rounded-xl bg-zinc-950 border border-zinc-800/80 space-y-3">
+          <div class="flex items-center justify-between">
+            <div>
+              <div class="text-xs font-semibold text-white">Modo Prueba (Test Events)</div>
+              <div class="text-[11px] text-zinc-400">Activa para ver eventos en la pestaña "Probar eventos".</div>
+            </div>
+            <input type="checkbox" id="checkTestMode" class="w-4 h-4 accent-violet-600 rounded">
+          </div>
+
+          <div id="testCodeContainer">
+            <label class="block text-[11px] font-medium text-zinc-400 mb-1">Código de Prueba de Meta (TESTxxxxx)</label>
+            <input type="text" id="inputTestCode" placeholder="Ej. TEST92244"
+                   class="w-full px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-800 text-white font-mono text-xs focus:outline-none focus:border-violet-500">
+          </div>
+        </div>
+
+        <button id="btnSaveConfig" class="w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-500 text-white font-semibold text-xs transition-all">
+          Guardar Ajustes
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast de Notificaciones -->
+  <div id="toast" class="fixed bottom-4 right-4 max-w-sm px-4 py-3 rounded-xl bg-zinc-900 border border-zinc-700 shadow-2xl text-xs text-white z-50 transform translate-y-20 opacity-0 transition-all duration-300 flex items-center gap-3">
+    <i id="toastIcon" class="fa-solid fa-circle-check text-emerald-400 text-base"></i>
+    <span id="toastMsg" class="flex-1">Operación realizada con éxito</span>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Función auxiliar para validar tipos y tamaños
+    function isValidLead(data) {
+      return data.name is string && data.name.size() <= 100
+          && data.phone is string && data.phone.size() <= 20
+          && data.status in ['prospecto', 'en_negociacion', 'cerrado', 'descartado']
+          && data.amount is number && data.amount >= 0;
+    }
+
+    // Colección de prospectos y ventas
+    match /leads/{leadId} {
+      allow read: if true;
+      allow create: if isValidLead(request.resource.data);
+      allow update: if request.resource.data.amount >= 0;
+      allow delete: if true;
+    }
+
+    // Colección de configuraciones
+    match /settings/{docId} {
+      allow read: if true;
+      allow write: if docId == 'meta_config' 
+                   && request.resource.data.testMode is bool;
+    }
+
+    // Bloqueo total por defecto para cualquier otra colección
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

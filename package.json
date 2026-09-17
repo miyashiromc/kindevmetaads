@@ -1,0 +1,16 @@
+{
+  "name": "kindev-meta-capi",
+  "version": "1.0.0",
+  "description": "Mini-CRM y Despachador de Meta Conversions API para Kindev S.A.S.",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "test:event": "node test_event.js"
+  },
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.21.2"
+  }
+}

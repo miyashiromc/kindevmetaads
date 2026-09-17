@@ -1,0 +1,12 @@
+# Environment and credentials
+*.txt
+.env
+.env.local
+.env.*.local
+node_modules/
+dist/
+build/
+.firebase/
+
+# Client PII and local DB
+data/leads.json
