@@ -13,7 +13,9 @@ import {
   Database, 
   Radio, 
   X, 
-  ChevronRight 
+  ChevronRight,
+  PanelLeftClose,
+  PanelLeftOpen
 } from 'lucide-react';
 import { TabView, MetaConfig, WhatsAppBotStatus } from '../types';
 import { META_DATASET_ID } from '../lib/meta-capi';
@@ -32,6 +34,8 @@ interface SidebarProps {
   onOpenConfig: () => void;
   onOpenWsStatus: () => void;
   onLock: () => void;
+  isCollapsed?: boolean;
+  onToggleCollapse?: () => void;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -48,6 +52,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenConfig,
   onOpenWsStatus,
   onLock,
+  isCollapsed = false,
+  onToggleCollapse
 }) => {
   const isWsConnected = wsStatus.isListening && wsStatus.status === 'connected';
 
@@ -117,30 +123,35 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
       {/* Barra Lateral (Sidebar) */}
       <aside
-        className={`fixed top-0 bottom-0 left-0 z-50 w-72 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 transition-transform duration-300 ease-in-out lg:static lg:translate-x-0 ${
-          isOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        className={`fixed top-0 bottom-0 left-0 z-50 bg-slate-900 text-slate-300 flex flex-col border-r border-slate-800 transition-all duration-300 ease-in-out lg:static lg:translate-x-0 ${
+          isCollapsed ? 'w-72 lg:w-20' : 'w-72'
+        } ${isOpen ? 'translate-x-0' : '-translate-x-full'}`}
       >
         {/* Cabecera de la Barra Lateral */}
-        <div className="p-5 border-b border-slate-800/80 flex items-center justify-between">
+        <div className={`border-b border-slate-800/80 flex items-center justify-between transition-all ${
+          isCollapsed ? 'p-3.5 lg:p-3 lg:justify-center' : 'p-5'
+        }`}>
           <div className="flex items-center gap-3">
-            <div className="p-1.5 bg-slate-800 rounded-xl border border-slate-700 shadow-inner flex items-center justify-center">
+            <div className="p-1.5 bg-slate-800 rounded-xl border border-slate-700 shadow-inner flex items-center justify-center shrink-0">
               <img 
                 src="/logo.png" 
                 alt="Kindev S.A.S." 
                 className="h-8 w-auto object-contain" 
               />
             </div>
-            <div>
-              <div className="flex items-center gap-1.5">
-                <h1 className="font-black text-white text-base tracking-tight">Kindev Meta Ads</h1>
+            {!isCollapsed && (
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5">
+                  <h1 className="font-black text-white text-base tracking-tight truncate">Kindev Meta Ads</h1>
+                </div>
+                <p className="text-[11px] text-slate-400 font-semibold tracking-wide truncate">
+                  CAPI Suite • SaaS 2026
+                </p>
               </div>
-              <p className="text-[11px] text-slate-400 font-semibold tracking-wide">
-                CAPI Suite • SaaS 2026
-              </p>
-            </div>
+            )}
           </div>
 
+          {/* Botón Cerrar Móvil */}
           <button
             type="button"
             onClick={onClose}
@@ -149,56 +160,100 @@ export const Sidebar: React.FC<SidebarProps> = ({
           >
             <X className="w-5 h-5" />
           </button>
+
+          {/* Botón Colapsar en Escritorio */}
+          {onToggleCollapse && !isCollapsed && (
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="hidden lg:flex p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Colapsar barra lateral"
+            >
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
+        {/* Botón Descolapsar en Escritorio (cuando está en modo riel) */}
+        {isCollapsed && onToggleCollapse && (
+          <div className="hidden lg:flex justify-center pt-2.5 pb-1">
+            <button
+              type="button"
+              onClick={onToggleCollapse}
+              className="p-2 rounded-xl text-slate-400 hover:text-white hover:bg-slate-800 transition-colors"
+              title="Expandir barra lateral"
+            >
+              <PanelLeftOpen className="w-4 h-4" />
+            </button>
+          </div>
+        )}
+
         {/* Widget del Escuchador de WhatsApp (Directo en el Sidebar) */}
-        <div className="p-4 border-b border-slate-800/60">
+        <div className={`border-b border-slate-800/60 ${isCollapsed ? 'p-2 lg:p-2' : 'p-4'}`}>
           <button
             type="button"
             onClick={onOpenWsStatus}
-            className={`w-full text-left p-3 rounded-2xl border transition-all active:scale-98 group ${
+            className={`w-full text-left rounded-2xl border transition-all active:scale-98 group ${
+              isCollapsed ? 'p-2.5 flex items-center justify-center' : 'p-3'
+            } ${
               isWsConnected
                 ? 'bg-emerald-950/30 border-emerald-500/30 hover:bg-emerald-950/50 text-emerald-300'
                 : wsStatus.status === 'qr_ready'
                 ? 'bg-amber-950/30 border-amber-500/30 hover:bg-amber-950/50 text-amber-300'
                 : 'bg-slate-800/50 border-slate-700/80 hover:bg-rose-950/30 hover:border-rose-500/30 text-slate-300'
             }`}
+            title={isWsConnected ? `WhatsApp Activo (+${wsStatus.user || '593991952889'})` : 'Ver estado WhatsApp'}
           >
-            <div className="flex items-center justify-between mb-1.5">
-              <div className="flex items-center gap-2">
-                <div className="relative flex items-center justify-center">
-                  <span className={`w-2.5 h-2.5 rounded-full ${
-                    isWsConnected ? 'bg-emerald-500' : wsStatus.status === 'qr_ready' ? 'bg-amber-500' : 'bg-rose-500'
-                  }`} />
-                  {isWsConnected && (
-                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping absolute" />
+            {isCollapsed ? (
+              <div className="relative flex items-center justify-center">
+                <MessageSquare className="w-4 h-4 text-emerald-400" />
+                <span className={`w-2 h-2 rounded-full absolute -top-1 -right-1.5 ${
+                  isWsConnected ? 'bg-emerald-500' : wsStatus.status === 'qr_ready' ? 'bg-amber-500' : 'bg-rose-500'
+                }`} />
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-2">
+                    <div className="relative flex items-center justify-center">
+                      <span className={`w-2.5 h-2.5 rounded-full ${
+                        isWsConnected ? 'bg-emerald-500' : wsStatus.status === 'qr_ready' ? 'bg-amber-500' : 'bg-rose-500'
+                      }`} />
+                      {isWsConnected && (
+                        <span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-ping absolute" />
+                      )}
+                    </div>
+                    <span className="font-extrabold text-xs tracking-tight text-white flex items-center gap-1">
+                      <MessageSquare className="w-3.5 h-3.5" />
+                      {isWsConnected ? 'WhatsApp Activo' : wsStatus.status === 'qr_ready' ? 'Escanear QR' : 'WhatsApp Offline'}
+                    </span>
+                  </div>
+                  <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
+                </div>
+
+                <div className="text-[11px] text-slate-400 truncate pl-4">
+                  {isWsConnected ? (
+                    <span>Línea: <strong className="text-emerald-400 font-mono">+{wsStatus.user || '593991952889'}</strong></span>
+                  ) : wsStatus.status === 'qr_ready' ? (
+                    <span className="text-amber-400">Toca para abrir código QR</span>
+                  ) : (
+                    <span className="text-rose-400">Servidor apagado o desconectado</span>
                   )}
                 </div>
-                <span className="font-extrabold text-xs tracking-tight text-white flex items-center gap-1">
-                  <MessageSquare className="w-3.5 h-3.5" />
-                  {isWsConnected ? 'WhatsApp Activo' : wsStatus.status === 'qr_ready' ? 'Escanear QR' : 'WhatsApp Offline'}
-                </span>
-              </div>
-              <ChevronRight className="w-3.5 h-3.5 text-slate-500 group-hover:translate-x-0.5 transition-transform" />
-            </div>
-
-            <div className="text-[11px] text-slate-400 truncate pl-4">
-              {isWsConnected ? (
-                <span>Línea: <strong className="text-emerald-400 font-mono">+{wsStatus.user || '593991952889'}</strong></span>
-              ) : wsStatus.status === 'qr_ready' ? (
-                <span className="text-amber-400">Toca para abrir código QR</span>
-              ) : (
-                <span className="text-rose-400">Servidor apagado o desconectado</span>
-              )}
-            </div>
+              </>
+            )}
           </button>
         </div>
 
         {/* Navegación Principal por Módulos */}
-        <div className="flex-1 px-3 py-4 space-y-1 overflow-y-auto scrollbar-none">
-          <div className="px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
-            Módulos Comerciales
-          </div>
+        <div className={`flex-1 space-y-1 overflow-y-auto scrollbar-none ${
+          isCollapsed ? 'p-2' : 'px-3 py-4'
+        }`}>
+          {!isCollapsed && (
+            <div className="px-3 pb-2 text-[10px] font-bold text-slate-500 uppercase tracking-wider">
+              Módulos Comerciales
+            </div>
+          )}
 
           {navItems.map((item) => {
             const Icon = item.icon;
@@ -209,90 +264,140 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 key={item.id}
                 type="button"
                 onClick={() => handleTabClick(item.id)}
-                className={`w-full text-left flex items-center justify-between gap-3 px-3.5 py-3 rounded-xl transition-all text-xs font-bold active:scale-98 ${
+                className={`w-full rounded-xl transition-all text-xs font-bold active:scale-98 relative group ${
+                  isCollapsed
+                    ? 'p-3 flex items-center justify-center'
+                    : 'text-left flex items-center justify-between gap-3 px-3.5 py-3'
+                } ${
                   isActive
                     ? 'bg-violet-600 text-white shadow-lg shadow-violet-600/30'
                     : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800/60'
                 }`}
+                title={item.label}
               >
-                <div className="flex items-center gap-3 min-w-0">
-                  <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
-                  <div className="min-w-0">
-                    <span className="block truncate">{item.label}</span>
-                    <span className={`block text-[10px] font-normal truncate ${isActive ? 'text-violet-200' : 'text-slate-500'}`}>
-                      {item.description}
-                    </span>
+                {isCollapsed ? (
+                  <div className="relative flex items-center justify-center">
+                    <Icon className={`w-5 h-5 ${isActive ? 'text-white' : 'text-slate-400 group-hover:text-white'}`} />
+                    {item.badge && (
+                      <span className="absolute -top-1.5 -right-2 text-[9px] font-black px-1.5 py-0.2 rounded-full bg-violet-500 text-white shadow-sm">
+                        {item.badge}
+                      </span>
+                    )}
                   </div>
-                </div>
+                ) : (
+                  <>
+                    <div className="flex items-center gap-3 min-w-0">
+                      <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-slate-400'}`} />
+                      <div className="min-w-0">
+                        <span className="block truncate">{item.label}</span>
+                        <span className={`block text-[10px] font-normal truncate ${isActive ? 'text-violet-200' : 'text-slate-500'}`}>
+                          {item.description}
+                        </span>
+                      </div>
+                    </div>
 
-                {item.badge && (
-                  <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
-                    isActive ? 'bg-white/20 text-white' : item.badgeClass || 'bg-slate-800 text-slate-300'
-                  }`}>
-                    {item.badge}
-                  </span>
+                    {item.badge && (
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full shrink-0 ${
+                        isActive ? 'bg-white/20 text-white' : item.badgeClass || 'bg-slate-800 text-slate-300'
+                      }`}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </>
                 )}
               </button>
             );
           })}
         </div>
 
-        {/* Estado del Entorno e Infraestructura */}
-        <div className="p-4 mx-3 mb-3 rounded-2xl bg-slate-800/40 border border-slate-800 text-[11px] space-y-2">
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <Database className="w-3.5 h-3.5 text-emerald-400" />
-              <span>Cloud Firestore:</span>
-            </span>
-            <span className="font-bold text-slate-200">
-              {firestoreConnected ? 'En línea' : 'Local'}
-            </span>
-          </div>
+        {/* Estado del Entorno e Infraestructura (Solo en vista expandida) */}
+        {!isCollapsed ? (
+          <div className="p-4 mx-3 mb-3 rounded-2xl bg-slate-800/40 border border-slate-800 text-[11px] space-y-2">
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <Database className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Cloud Firestore:</span>
+              </span>
+              <span className="font-bold text-slate-200">
+                {firestoreConnected ? 'En línea' : 'Local'}
+              </span>
+            </div>
 
-          <div className="flex items-center justify-between text-slate-400">
-            <span className="flex items-center gap-1.5">
-              <Radio className="w-3.5 h-3.5 text-violet-400" />
-              <span>Dataset CAPI:</span>
-            </span>
-            <span className="font-mono font-bold text-slate-300 text-[10px]">
-              {META_DATASET_ID.slice(0, 6)}...
-            </span>
+            <div className="flex items-center justify-between text-slate-400">
+              <span className="flex items-center gap-1.5">
+                <Radio className="w-3.5 h-3.5 text-violet-400" />
+                <span>Dataset CAPI:</span>
+              </span>
+              <span className="font-mono font-bold text-slate-300 text-[10px]">
+                {META_DATASET_ID.slice(0, 6)}...
+              </span>
+            </div>
           </div>
-        </div>
+        ) : (
+          <div className="py-2 flex flex-col items-center gap-2 border-t border-slate-800">
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Firestore En línea" />
+            <span className="w-2.5 h-2.5 rounded-full bg-violet-500" title="Meta CAPI Conectado" />
+          </div>
+        )}
 
         {/* Barra Inferior del Sidebar (Configuraciones y Perfil) */}
-        <div className="p-4 border-t border-slate-800/80 bg-slate-900/90 flex items-center justify-between gap-2">
-          <button
-            type="button"
-            onClick={onOpenConfig}
-            className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
-              config.testMode
-                ? 'bg-amber-950/40 text-amber-300 border-amber-500/40 hover:bg-amber-900/50'
-                : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
-            }`}
-            title="Configuración de Meta y Tokens"
-          >
-            <FlaskConical className="w-3.5 h-3.5 text-amber-400" />
-            <span className="truncate">{config.testMode ? 'Modo Prueba' : 'Producción'}</span>
-          </button>
+        <div className={`border-t border-slate-800/80 bg-slate-900/90 flex items-center transition-all ${
+          isCollapsed ? 'p-2 flex-col gap-2 justify-center' : 'p-4 justify-between gap-2'
+        }`}>
+          {!isCollapsed ? (
+            <>
+              <button
+                type="button"
+                onClick={onOpenConfig}
+                className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                  config.testMode
+                    ? 'bg-amber-950/40 text-amber-300 border-amber-500/40 hover:bg-amber-900/50'
+                    : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
+                }`}
+                title="Configuración de Meta y Tokens"
+              >
+                <FlaskConical className="w-3.5 h-3.5 text-amber-400" />
+                <span className="truncate">{config.testMode ? 'Modo Prueba' : 'Producción'}</span>
+              </button>
 
-          <button
-            type="button"
-            onClick={onOpenConfig}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all shrink-0"
-            title="Ajustes y Parámetros"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
+              <button
+                type="button"
+                onClick={onOpenConfig}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all shrink-0"
+                title="Ajustes y Parámetros"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
 
-          <button
-            type="button"
-            onClick={onLock}
-            className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 transition-all shrink-0"
-            title="Bloquear sesión"
-          >
-            <Lock className="w-4 h-4" />
-          </button>
+              <button
+                type="button"
+                onClick={onLock}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 transition-all shrink-0"
+                title="Bloquear sesión"
+              >
+                <Lock className="w-4 h-4" />
+              </button>
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                onClick={onOpenConfig}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all"
+                title="Ajustes y Configuración"
+              >
+                <Settings className="w-4 h-4" />
+              </button>
+              <button
+                type="button"
+                onClick={onLock}
+                className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 border border-slate-700 transition-all"
+                title="Bloquear sesión"
+              >
+                <Lock className="w-4 h-4" />
+              </button>
+            </>
+          )}
         </div>
 
       </aside>

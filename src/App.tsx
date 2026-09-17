@@ -72,6 +72,7 @@ export const App: React.FC = () => {
   // 4. Módulo Activo / Pestaña
   const [activeTab, setActiveTab] = useState<TabView>('kanban');
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
 
   // 5. Modales y Notificaciones
   const [saleLead, setSaleLead] = useState<Lead | null>(null);
@@ -494,6 +495,8 @@ export const App: React.FC = () => {
         onOpenConfig={() => setIsConfigOpen(true)}
         onOpenWsStatus={() => setIsWsModalOpen(true)}
         onLock={handleLock}
+        isCollapsed={isSidebarCollapsed}
+        onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
       />
 
       {/* 2. Área de Contenido Principal */}
@@ -507,10 +510,16 @@ export const App: React.FC = () => {
           config={config}
           wsStatus={wsStatus}
           onOpenWsStatus={() => setIsWsModalOpen(true)}
+          isSidebarCollapsed={isSidebarCollapsed}
+          onToggleSidebarCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
         />
 
         {/* Contenedor Principal */}
-        <main className="p-4 md:p-6 lg:p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
+        <main className={`flex-1 w-full transition-all ${
+          activeTab === 'kanban'
+            ? 'p-3 sm:p-4 md:p-6 max-w-none space-y-4'
+            : 'p-4 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6'
+        }`}>
           
           {/* Banner informativo de modo prueba si está activo */}
           {config.testMode && (
@@ -541,6 +550,8 @@ export const App: React.FC = () => {
             onUpdateStatus={handleUpdateStatus}
             onOpenSaleModal={(lead) => setSaleLead(lead)}
             onAddNewLead={() => setActiveTab('quick_list')}
+            isSidebarCollapsed={isSidebarCollapsed}
+            onToggleSidebarCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           />
         )}
 
@@ -729,7 +740,7 @@ export const App: React.FC = () => {
 
         {/* Footer Empresarial Luminous */}
         <footer className="border-t border-slate-200/80 bg-white py-3.5 px-6 mt-auto">
-          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+          <div className={`${activeTab === 'kanban' ? 'w-full px-2' : 'max-w-7xl mx-auto'} flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2`}>
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="Kindev Logo" className="h-4 w-auto object-contain opacity-70" />
               <span>© 2026 Kindev S.A.S. • Conversions API Engine v2.0 Enterprise</span>
