@@ -77,9 +77,9 @@ export const SecurityGate: React.FC<SecurityGateProps> = ({ onUnlock }) => {
           </button>
         </form>
 
-        <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-1 text-[11px] text-slate-400">
-          <Lock className="w-3 h-3" />
-          <span>PIN por defecto: <code className="font-mono font-semibold text-slate-600">kindev2026</code></span>
+        <div className="pt-2 border-t border-slate-100 flex items-center justify-center gap-1.5 text-[11px] text-slate-400">
+          <Lock className="w-3 h-3 text-slate-400" />
+          <span>Acceso privado exclusivo para administradores de Kindev S.A.S.</span>
         </div>
 
       </div>
