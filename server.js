@@ -117,6 +117,7 @@ async function startWhatsAppBot() {
 
       // 🔍 FILTRO ESTRICTO: Solo capturar si el mensaje contiene palabras del anuncio
       const AD_KEYWORDS = [
+        'deseo hablar con un asesor', 'hablar con un asesor', 'asesor', 'asesoría', 'asesoria',
         'anuncio', 'publicidad', 'web', 'página', 'pagina', 'paginas', 'páginas',
         'cotizar', 'cotización', 'cotizacion', 'landing', 'saas', 'software',
         '120', 'precio', 'costo', 'planes', 'interesa', 'información', 'informacion',
