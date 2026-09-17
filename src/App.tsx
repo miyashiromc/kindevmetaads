@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { Search, Filter } from 'lucide-react';
+import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from './lib/firebase';
 import { Lead, LeadStatus, MetaConfig, DashboardStats, MetaEventRecord } from './types';
 import { dispatchMetaCAPI } from './lib/meta-capi';
@@ -51,6 +51,8 @@ export const App: React.FC = () => {
   const [firestoreConnected, setFirestoreConnected] = useState<boolean>(true);
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const LEADS_PER_PAGE = 5;
 
   // 4. Modales y Notificaciones
   const [saleLead, setSaleLead] = useState<Lead | null>(null);
@@ -149,6 +151,18 @@ export const App: React.FC = () => {
       return matchesSearch && matchesStatus;
     });
   }, [leads, searchQuery, statusFilter]);
+
+  // Reset de página al buscar o filtrar
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, statusFilter]);
+
+  // Paginación horizontal (máximo 5 clientes por vista)
+  const totalPages = Math.ceil(filteredLeads.length / LEADS_PER_PAGE) || 1;
+  const paginatedLeads = useMemo(() => {
+    const start = (currentPage - 1) * LEADS_PER_PAGE;
+    return filteredLeads.slice(start, start + LEADS_PER_PAGE);
+  }, [filteredLeads, currentPage]);
 
   // Handlers
   const handleAddLead = async (data: {
@@ -396,6 +410,7 @@ export const App: React.FC = () => {
               <h3 className="text-lg font-bold text-slate-900 tracking-tight">Gestión de Clientes & Ventas</h3>
               <p className="text-xs text-slate-500">
                 Total: {filteredLeads.length} {filteredLeads.length === 1 ? 'cliente' : 'clientes'}
+                {totalPages > 1 && ` • Página ${currentPage} de ${totalPages}`}
               </p>
             </div>
 
@@ -475,17 +490,66 @@ export const App: React.FC = () => {
               </p>
             </div>
           ) : (
-            <div className="grid grid-cols-1 gap-3">
-              {filteredLeads.map((lead) => (
-                <LeadCard
-                  key={lead.id}
-                  lead={lead}
-                  onOpenSale={(l) => setSaleLead(l)}
-                  onUpdateStatus={handleUpdateStatus}
-                  onDelete={handleDelete}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid grid-cols-1 gap-3">
+                {paginatedLeads.map((lead) => (
+                  <LeadCard
+                    key={lead.id}
+                    lead={lead}
+                    onOpenSale={(l) => setSaleLead(l)}
+                    onUpdateStatus={handleUpdateStatus}
+                    onDelete={handleDelete}
+                  />
+                ))}
+              </div>
+
+              {/* Barra de Navegación Horizontal (Paginador) */}
+              {totalPages > 1 && (
+                <div className="flex flex-col sm:flex-row items-center justify-between gap-3 bg-white p-3.5 rounded-2xl border border-slate-200/90 shadow-sm mt-2">
+                  <div className="text-xs text-slate-500 font-medium">
+                    Mostrando <span className="font-bold text-slate-800">{(currentPage - 1) * LEADS_PER_PAGE + 1}</span> a{' '}
+                    <span className="font-bold text-slate-800">{Math.min(currentPage * LEADS_PER_PAGE, filteredLeads.length)}</span> de{' '}
+                    <span className="font-bold text-slate-800">{filteredLeads.length}</span> clientes
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                      disabled={currentPage === 1}
+                      className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 text-xs font-bold text-slate-700 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                    >
+                      <ChevronLeft className="w-4 h-4" />
+                      <span>Anterior</span>
+                    </button>
+                    <div className="flex items-center gap-1">
+                      {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                        <button
+                          key={page}
+                          type="button"
+                          onClick={() => setCurrentPage(page)}
+                          className={`w-8 h-8 rounded-xl text-xs font-bold transition-all ${
+                            currentPage === page
+                              ? 'bg-violet-600 text-white shadow-md shadow-violet-600/20'
+                              : 'bg-slate-50 text-slate-600 hover:bg-slate-100 border border-slate-200'
+                          }`}
+                        >
+                          {page}
+                        </button>
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                      disabled={currentPage === totalPages}
+                      className="px-3 py-1.5 rounded-xl bg-slate-50 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed border border-slate-200 text-xs font-bold text-slate-700 transition-all flex items-center gap-1 shadow-sm active:scale-95"
+                    >
+                      <span>Siguiente</span>
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </section>
 
