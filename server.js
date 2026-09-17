@@ -1,4 +1,4 @@
-﻿import express from 'express';
+import express from 'express';
 import cors from 'cors';
 import path from 'node:path';
 import fs from 'node:fs';
@@ -113,9 +113,25 @@ async function startWhatsAppBot() {
         msg.message?.conversation ||
         msg.message?.extendedTextMessage?.text ||
         msg.message?.imageMessage?.caption ||
-        'Mensaje inicial de WhatsApp';
+        '';
 
-      console.log(`📩 [WhatsApp Mensaje Entrante] De: ${pushName} (${phone}) - "${text}"`);
+      // 🔍 FILTRO ESTRICTO: Solo capturar si el mensaje contiene palabras del anuncio
+      const AD_KEYWORDS = [
+        'anuncio', 'publicidad', 'web', 'página', 'pagina', 'paginas', 'páginas',
+        'cotizar', 'cotización', 'cotizacion', 'landing', 'saas', 'software',
+        '120', 'precio', 'costo', 'planes', 'interesa', 'información', 'informacion',
+        'paquete', 'kindev'
+      ];
+
+      const lowerText = text.toLowerCase().trim();
+      const isFromAd = AD_KEYWORDS.some((kw) => lowerText.includes(kw));
+
+      if (!isFromAd) {
+        console.log(`ℹ️ [WhatsApp Ignorado] Mensaje de ${pushName} (${phone}) no contiene términos del anuncio: "${text}"`);
+        continue;
+      }
+
+      console.log(`🎯 [Lead de Publicidad Detectado!] De: ${pushName} (${phone}) - "${text}"`);
       registeredNumbers.add(phone);
 
       // Guardar directamente en Cloud Firestore
