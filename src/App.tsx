@@ -2,7 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { Search, Filter } from 'lucide-react';
 import { db } from './lib/firebase';
-import { Lead, LeadStatus, MetaConfig, DashboardStats } from './types';
+import { Lead, LeadStatus, MetaConfig, DashboardStats, MetaEventRecord } from './types';
 import { dispatchMetaCAPI } from './lib/meta-capi';
 import { SecurityGate } from './components/SecurityGate';
 import { Header } from './components/Header';
@@ -151,19 +151,54 @@ export const App: React.FC = () => {
   }, [leads, searchQuery, statusFilter]);
 
   // Handlers
-  const handleAddLead = async (data: { name: string; phone: string; service: string }) => {
-    const newLeadData = {
-      name: data.name,
-      phone: data.phone,
-      displayPhone: data.phone,
-      service: data.service,
-      status: 'prospecto' as LeadStatus,
-      amount: 0,
-      createdAt: new Date().toISOString(),
-      metaEvents: []
-    };
+  const handleAddLead = async (data: {
+    name: string;
+    phone: string;
+    service: string;
+    amount?: number;
+    isClosedImmediately?: boolean;
+    note?: string;
+  }) => {
+    const saleAmount = Number(data.amount || 0);
+    const isClosed = Boolean(data.isClosedImmediately);
+    let initialEvents: MetaEventRecord[] = [];
 
     try {
+      if (isClosed && saleAmount > 0) {
+        // Enviar compra inmediatamente a Meta
+        const capiRes = await dispatchMetaCAPI({
+          eventName: 'Purchase',
+          phone: data.phone,
+          name: data.name,
+          value: saleAmount,
+          currency: 'USD',
+          testMode: config.testMode,
+          testEventCode: config.testEventCode
+        });
+
+        initialEvents = [{
+          eventName: 'Purchase',
+          amount: saleAmount,
+          currency: 'USD',
+          date: new Date().toISOString(),
+          fbtraceId: capiRes.fbtraceId,
+          testMode: config.testMode
+        }];
+      }
+
+      const newLeadData = {
+        name: data.name,
+        phone: data.phone,
+        displayPhone: data.phone,
+        service: data.service,
+        notes: data.note || '',
+        status: (isClosed ? 'cerrado' : 'prospecto') as LeadStatus,
+        amount: saleAmount,
+        createdAt: new Date().toISOString(),
+        saleDate: isClosed ? new Date().toISOString() : undefined,
+        metaEvents: initialEvents
+      };
+
       if (firestoreConnected) {
         await addDoc(collection(db, 'leads'), newLeadData);
       } else {
@@ -176,16 +211,19 @@ export const App: React.FC = () => {
         localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
       }
 
-      showToast(`Prospecto ${data.name} registrado con éxito`, 'success');
-
-      // Despacho opcional silencioso de evento Lead / Contact a Meta CAPI
-      dispatchMetaCAPI({
-        eventName: 'Lead',
-        phone: data.phone,
-        name: data.name,
-        testMode: config.testMode,
-        testEventCode: config.testEventCode
-      }).catch((capiErr) => console.log('CAPI Lead background warning:', capiErr));
+      if (isClosed) {
+        showToast(`¡Venta de $${saleAmount.toFixed(2)} USD registrada y enviada a Meta!`, 'success');
+      } else {
+        showToast(`Prospecto ${data.name} registrado con éxito`, 'success');
+        // Despacho opcional silencioso de evento Lead a Meta CAPI
+        dispatchMetaCAPI({
+          eventName: 'Lead',
+          phone: data.phone,
+          name: data.name,
+          testMode: config.testMode,
+          testEventCode: config.testEventCode
+        }).catch((capiErr) => console.log('CAPI Lead background warning:', capiErr));
+      }
 
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al guardar prospecto';
@@ -210,7 +248,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleConfirmSale = async (leadId: string, amount: number) => {
+  const handleConfirmSale = async (leadId: string, amount: number, note?: string) => {
     const targetLead = leads.find((l) => l.id === leadId);
     if (!targetLead) return;
 
@@ -226,8 +264,8 @@ export const App: React.FC = () => {
         testEventCode: config.testEventCode
       });
 
-      const newMetaEvent = {
-        eventName: 'Purchase' as const,
+      const newMetaEvent: MetaEventRecord = {
+        eventName: 'Purchase',
         amount,
         currency: 'USD',
         date: new Date().toISOString(),
@@ -236,6 +274,7 @@ export const App: React.FC = () => {
       };
 
       const updatedEvents = [...(targetLead.metaEvents || []), newMetaEvent];
+      const updatedNotes = note ? note : targetLead.notes || '';
 
       // 2. Guardar en Firestore o Local
       if (firestoreConnected) {
@@ -243,6 +282,7 @@ export const App: React.FC = () => {
         await updateDoc(leadRef, {
           status: 'cerrado',
           amount,
+          notes: updatedNotes,
           saleDate: new Date().toISOString(),
           metaEvents: updatedEvents
         });
@@ -253,6 +293,7 @@ export const App: React.FC = () => {
                 ...l,
                 status: 'cerrado' as LeadStatus,
                 amount,
+                notes: updatedNotes,
                 saleDate: new Date().toISOString(),
                 metaEvents: updatedEvents
               }
@@ -262,7 +303,7 @@ export const App: React.FC = () => {
         localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
       }
 
-      showToast(`¡Venta de $${amount} USD enviada a Meta CAPI! (Trace: ${capiRes.fbtraceId})`, 'success');
+      showToast(`¡Venta de $${amount.toFixed(2)} USD enviada a Meta CAPI! (Trace: ${capiRes.fbtraceId})`, 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error enviando evento a Meta CAPI';
       showToast(msg, 'error');

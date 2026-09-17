@@ -1,5 +1,5 @@
-import React from 'react';
-import { MessageCircle, DollarSign, Plus, Trash2, CheckCircle, Clock, User, XCircle } from 'lucide-react';
+﻿import React from 'react';
+import { MessageCircle, DollarSign, Trash2, CheckCircle, Clock, User, XCircle, Edit3 } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
 
 interface LeadCardProps {
@@ -26,7 +26,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
             <Clock className="w-3.5 h-3.5 text-amber-600" />
-            En Negociación
+            En Negociación {lead.amount > 0 ? `($${Number(lead.amount).toFixed(2)})` : ''}
           </span>
         );
       case 'descartado':
@@ -40,7 +40,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
         return (
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
             <User className="w-3.5 h-3.5 text-slate-500" />
-            Prospecto
+            Prospecto {lead.amount > 0 ? `($${Number(lead.amount).toFixed(2)})` : ''}
           </span>
         );
     }
@@ -109,16 +109,16 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
             className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 active:scale-95 text-white font-bold text-xs shadow-md shadow-emerald-600/20 transition-all flex items-center gap-1.5"
           >
             <DollarSign className="w-3.5 h-3.5" />
-            <span>Cerrar Venta</span>
+            <span>Cerrar Venta {lead.amount > 0 ? `($${lead.amount})` : ''}</span>
           </button>
         ) : (
           <button
             onClick={() => onOpenSale(lead)}
             className="px-3.5 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all flex items-center gap-1.5"
-            title="Registrar otra venta a Meta"
+            title="Ajustar precio o registrar nueva venta a Meta"
           >
-            <Plus className="w-3.5 h-3.5" />
-            <span>Re-facturar</span>
+            <Edit3 className="w-3.5 h-3.5 text-slate-500" />
+            <span>Editar / Re-facturar</span>
           </button>
         )}
 
