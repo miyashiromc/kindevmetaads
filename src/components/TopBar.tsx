@@ -1,0 +1,137 @@
+import React from 'react';
+import { 
+  Menu, 
+  PlusCircle, 
+  Calendar 
+} from 'lucide-react';
+import { TabView, MetaConfig, WhatsAppBotStatus } from '../types';
+
+interface TopBarProps {
+  activeTab: TabView;
+  onOpenSidebar: () => void;
+  onAddNewLead: () => void;
+  config: MetaConfig;
+  wsStatus: WhatsAppBotStatus;
+  onOpenWsStatus: () => void;
+}
+
+export const TopBar: React.FC<TopBarProps> = ({
+  activeTab,
+  onOpenSidebar,
+  onAddNewLead,
+  config,
+  wsStatus,
+  onOpenWsStatus
+}) => {
+  const isWsConnected = wsStatus.isListening && wsStatus.status === 'connected';
+
+  const tabTitles: Record<TabView, { title: string; subtitle: string }> = {
+    kanban: {
+      title: 'Pipeline Visual Kanban',
+      subtitle: 'Flujo de ventas en 5 etapas comerciales'
+    },
+    analytics: {
+      title: 'Métricas & Analítica',
+      subtitle: 'Embudo de conversión, facturación y KPIs'
+    },
+    ads_intelligence: {
+      title: 'Inteligencia de Meta Ads',
+      subtitle: 'Comparativa de creativos, ROAS y recomendaciones'
+    },
+    ltv_clients: {
+      title: 'Clientes & Recompra (LTV)',
+      subtitle: 'Gestión de renovaciones de hosting y segundas fases'
+    },
+    follow_up: {
+      title: 'Centro de Seguimiento',
+      subtitle: 'Alertas de inactividad y reactivación comercial'
+    },
+    quick_list: {
+      title: 'Registro & Lista Rápida',
+      subtitle: 'Captura de prospectos y listado paginado'
+    }
+  };
+
+  const current = tabTitles[activeTab] || tabTitles.kanban;
+
+  const todayStr = new Date().toLocaleDateString('es-EC', {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short'
+  });
+
+  return (
+    <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-4 md:px-6 py-3.5 transition-all">
+      <div className="flex items-center justify-between gap-4">
+        
+        {/* Lado Izquierdo: Botón Menú Móvil + Título & Breadcrumb */}
+        <div className="flex items-center gap-3 min-w-0">
+          <button
+            type="button"
+            onClick={onOpenSidebar}
+            className="lg:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors shrink-0"
+            title="Abrir menú"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+              <span>Panel</span>
+              <span>/</span>
+              <span className="text-violet-600 font-bold">{current.title}</span>
+            </div>
+            <h1 className="text-base md:text-lg font-black text-slate-900 tracking-tight truncate">
+              {current.title}
+            </h1>
+          </div>
+        </div>
+
+        {/* Lado Derecho: Indicadores Rápidos & Acciones */}
+        <div className="flex items-center gap-2.5">
+          {/* Fecha Actual */}
+          <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold">
+            <Calendar className="w-3.5 h-3.5 text-slate-400" />
+            <span className="capitalize">{todayStr}</span>
+          </div>
+
+          {/* Estado Rápido WhatsApp */}
+          <button
+            type="button"
+            onClick={onOpenWsStatus}
+            className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
+              isWsConnected
+                ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                : 'bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border-slate-200'
+            }`}
+          >
+            <span className={`w-2 h-2 rounded-full ${isWsConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+            <span>{isWsConnected ? 'WS Conectado' : 'WS Desconectado'}</span>
+          </button>
+
+          {/* Modo Prueba / Producción */}
+          <span className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border ${
+            config.testMode
+              ? 'bg-amber-50 text-amber-800 border-amber-300'
+              : 'bg-slate-50 text-slate-700 border-slate-200'
+          }`}>
+            <span className={`w-1.5 h-1.5 rounded-full ${config.testMode ? 'bg-amber-500 animate-pulse' : 'bg-slate-400'}`} />
+            <span>{config.testMode ? `Prueba (${config.testEventCode || 'TEST'})` : 'Producción'}</span>
+          </span>
+
+          {/* Botón "+ Nuevo Contacto" */}
+          <button
+            type="button"
+            onClick={onAddNewLead}
+            className="py-2 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 shrink-0"
+          >
+            <PlusCircle className="w-4 h-4 text-violet-400" />
+            <span className="hidden sm:inline">Nuevo Contacto</span>
+            <span className="sm:hidden">Nuevo</span>
+          </button>
+        </div>
+
+      </div>
+    </header>
+  );
+};

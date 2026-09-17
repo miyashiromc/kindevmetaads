@@ -13,8 +13,8 @@ import {
 } from './types';
 import { dispatchMetaCAPI } from './lib/meta-capi';
 import { SecurityGate } from './components/SecurityGate';
-import { Header } from './components/Header';
-import { NavigationTabs } from './components/NavigationTabs';
+import { Sidebar } from './components/Sidebar';
+import { TopBar } from './components/TopBar';
 import { KanbanBoard } from './components/KanbanBoard';
 import { AnalyticsView } from './components/AnalyticsView';
 import { MetaAdsIntelligence } from './components/MetaAdsIntelligence';
@@ -71,6 +71,7 @@ export const App: React.FC = () => {
 
   // 4. Módulo Activo / Pestaña
   const [activeTab, setActiveTab] = useState<TabView>('kanban');
+  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
 
   // 5. Modales y Notificaciones
   const [saleLead, setSaleLead] = useState<Lead | null>(null);
@@ -476,50 +477,62 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 flex flex-col font-sans selection:bg-violet-100 selection:text-violet-900">
+    <div className="min-h-screen bg-slate-100/70 text-slate-900 flex font-sans antialiased selection:bg-violet-100 selection:text-violet-900">
       
-      {/* Barra de Navegación Superior */}
-      <Header
+      {/* 1. Barra Lateral Izquierda (Sidebar Empresarial) */}
+      <Sidebar
+        isOpen={isSidebarOpen}
+        onClose={() => setIsSidebarOpen(false)}
+        activeTab={activeTab}
+        onSelectTab={(tab) => setActiveTab(tab)}
         config={config}
         wsStatus={wsStatus}
+        kanbanCount={leads.filter((l) => l.status !== 'descartado').length}
+        closedCount={leads.filter((l) => l.status === 'cerrado').length}
+        followUpCount={leads.filter((l) => ['prospecto', 'cotizado', 'en_negociacion'].includes(l.status)).length}
+        firestoreConnected={firestoreConnected}
         onOpenConfig={() => setIsConfigOpen(true)}
         onOpenWsStatus={() => setIsWsModalOpen(true)}
         onLock={handleLock}
       />
 
-      {/* Contenedor Principal */}
-      <main className="max-w-6xl w-full mx-auto px-4 py-6 md:py-8 space-y-6 flex-1">
+      {/* 2. Área de Contenido Principal */}
+      <div className="flex-1 flex flex-col min-w-0 h-screen overflow-y-auto">
         
-        {/* Banner informativo de modo prueba si está activo */}
-        {config.testMode && (
-          <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-4 flex items-center justify-between gap-4 text-amber-900 text-xs shadow-sm">
-            <div className="flex items-center gap-2.5">
-              <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping shrink-0" />
-              <span>
-                <strong>Modo Prueba Meta Activo:</strong> Los eventos se están despachando con el código{' '}
-                <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded text-amber-800 font-bold">
-                  {config.testEventCode || 'TEST92244'}
-                </code>
-                . Puedes visualizarlos en vivo en el Events Manager de Meta.
-              </span>
-            </div>
-            <button
-              onClick={() => setIsConfigOpen(true)}
-              className="font-bold underline hover:text-amber-700 shrink-0 text-xs"
-            >
-              Cambiar
-            </button>
-          </div>
-        )}
-
-        {/* Selector de Vistas de la Suite Comercial Kindev */}
-        <NavigationTabs
+        {/* Barra Superior (TopBar) */}
+        <TopBar
           activeTab={activeTab}
-          onSelectTab={(tab) => setActiveTab(tab)}
-          kanbanCount={leads.filter((l) => l.status !== 'descartado').length}
-          closedCount={leads.filter((l) => l.status === 'cerrado').length}
-          followUpCount={leads.filter((l) => ['prospecto', 'cotizado', 'en_negociacion'].includes(l.status)).length}
+          onOpenSidebar={() => setIsSidebarOpen(true)}
+          onAddNewLead={() => setActiveTab('quick_list')}
+          config={config}
+          wsStatus={wsStatus}
+          onOpenWsStatus={() => setIsWsModalOpen(true)}
         />
+
+        {/* Contenedor Principal */}
+        <main className="p-4 md:p-6 lg:p-8 space-y-6 flex-1 max-w-7xl w-full mx-auto">
+          
+          {/* Banner informativo de modo prueba si está activo */}
+          {config.testMode && (
+            <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-4 flex items-center justify-between gap-4 text-amber-900 text-xs shadow-sm">
+              <div className="flex items-center gap-2.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping shrink-0" />
+                <span>
+                  <strong>Modo Prueba Meta Activo:</strong> Los eventos se están despachando con el código{' '}
+                  <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded text-amber-800 font-bold">
+                    {config.testEventCode || 'TEST92244'}
+                  </code>
+                  . Puedes visualizarlos en vivo en el Events Manager de Meta.
+                </span>
+              </div>
+              <button
+                onClick={() => setIsConfigOpen(true)}
+                className="font-bold underline hover:text-amber-700 shrink-0 text-xs"
+              >
+                Cambiar
+              </button>
+            </div>
+          )}
 
         {/* 1. Módulo: Pipeline Kanban */}
         {activeTab === 'kanban' && (
@@ -712,22 +725,24 @@ export const App: React.FC = () => {
         </div>
       )}
 
-      </main>
+        </main>
 
-      {/* Footer Luminous */}
-      <footer className="border-t border-slate-200/80 bg-white py-4 mt-auto">
-        <div className="max-w-6xl mx-auto px-4 flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
-          <div className="flex items-center gap-2">
-            <img src="/logo.png" alt="Kindev Logo" className="h-4 w-auto object-contain opacity-70" />
-            <span>© 2026 Kindev S.A.S. • Conversions API Engine v2.0</span>
+        {/* Footer Empresarial Luminous */}
+        <footer className="border-t border-slate-200/80 bg-white py-3.5 px-6 mt-auto">
+          <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
+            <div className="flex items-center gap-2">
+              <img src="/logo.png" alt="Kindev Logo" className="h-4 w-auto object-contain opacity-70" />
+              <span>© 2026 Kindev S.A.S. • Conversions API Engine v2.0 Enterprise</span>
+            </div>
+            <div className="flex items-center gap-3 font-medium text-[11px]">
+              <span>Cloud Firestore: {firestoreConnected ? 'En línea' : 'Modo local'}</span>
+              <span>•</span>
+              <span>Meta Graph v19.0</span>
+            </div>
           </div>
-          <div className="flex items-center gap-3 font-medium text-[11px]">
-            <span>Cloud Firestore: {firestoreConnected ? 'En línea' : 'Modo local'}</span>
-            <span>•</span>
-            <span>Meta Graph v19.0</span>
-          </div>
-        </div>
-      </footer>
+        </footer>
+
+      </div>
 
       {/* Modal de Cierre de Venta */}
       <SaleModal
