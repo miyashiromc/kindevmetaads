@@ -31,6 +31,54 @@ import { Toast, ToastData } from './components/Toast';
 
 const FALLBACK_STORAGE_KEY = 'kindev_leads_cache';
 
+// Mapeo oficial de Pestañas ↔ Hash (#) para navegación amigable e historial
+const TAB_TO_HASH: Record<TabView, string> = {
+  kanban: '#kanban',
+  analytics: '#metricas',
+  ads_intelligence: '#meta-ads',
+  ltv_clients: '#ltv-clientes',
+  follow_up: '#seguimiento',
+  quick_list: '#directorio'
+};
+
+const getTabFromHash = (hash: string): TabView => {
+  const clean = hash.replace(/^#\/?/, '').toLowerCase().trim();
+  switch (clean) {
+    case 'kanban':
+    case 'pipeline':
+      return 'kanban';
+    case 'metricas':
+    case 'analytics':
+    case 'graficos':
+    case 'analitica':
+      return 'analytics';
+    case 'meta-ads':
+    case 'ads':
+    case 'ads_intelligence':
+    case 'anuncios':
+    case 'roas':
+      return 'ads_intelligence';
+    case 'ltv':
+    case 'ltv-clientes':
+    case 'ltv_clients':
+    case 'recompra':
+    case 'clientes':
+      return 'ltv_clients';
+    case 'seguimiento':
+    case 'follow_up':
+    case 'followup':
+      return 'follow_up';
+    case 'directorio':
+    case 'lista':
+    case 'quick_list':
+    case 'registro':
+    case 'leads':
+      return 'quick_list';
+    default:
+      return 'kanban';
+  }
+};
+
 export const App: React.FC = () => {
   // 1. Estado de Autenticación / Acceso
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
@@ -70,8 +118,58 @@ export const App: React.FC = () => {
   const [currentPage, setCurrentPage] = useState<number>(1);
   const LEADS_PER_PAGE = 5;
 
-  // 4. Módulo Activo / Pestaña
-  const [activeTab, setActiveTab] = useState<TabView>('kanban');
+  // 4. Módulo Activo / Pestaña con Soporte de Hash (#)
+  const [activeTab, setActiveTabState] = useState<TabView>(() => {
+    if (typeof window !== 'undefined' && window.location.hash) {
+      return getTabFromHash(window.location.hash);
+    }
+    return 'kanban';
+  });
+
+  const setActiveTab = (tab: TabView, replace: boolean = false) => {
+    setActiveTabState(tab);
+    if (typeof window !== 'undefined') {
+      const targetHash = TAB_TO_HASH[tab] || `#${tab}`;
+      if (window.location.hash !== targetHash) {
+        if (replace) {
+          window.history.replaceState(null, '', targetHash);
+        } else {
+          window.history.pushState(null, '', targetHash);
+        }
+      }
+    }
+  };
+
+  // Sincronización bidireccional con eventos de historial (HashChange / PopState)
+  useEffect(() => {
+    const handleHashSync = () => {
+      if (typeof window === 'undefined') return;
+      const currentTab = getTabFromHash(window.location.hash);
+      setActiveTabState(currentTab);
+    };
+
+    window.addEventListener('hashchange', handleHashSync);
+    window.addEventListener('popstate', handleHashSync);
+
+    // Si entra a la página sin hash, asignar el hash por defecto correspondiente
+    if (typeof window !== 'undefined') {
+      if (!window.location.hash) {
+        const initialHash = TAB_TO_HASH[activeTab] || '#kanban';
+        window.history.replaceState(null, '', initialHash);
+      } else {
+        const initialTab = getTabFromHash(window.location.hash);
+        if (initialTab !== activeTab) {
+          setActiveTabState(initialTab);
+        }
+      }
+    }
+
+    return () => {
+      window.removeEventListener('hashchange', handleHashSync);
+      window.removeEventListener('popstate', handleHashSync);
+    };
+  }, []);
+
   const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState<boolean>(false);
 
