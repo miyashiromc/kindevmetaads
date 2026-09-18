@@ -84,6 +84,16 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [activeDropCol, setActiveDropCol] = useState<LeadStatus | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
+  const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
+  const columnsContainerRef = React.useRef<HTMLDivElement>(null);
+
+  const scrollToStage = (status: LeadStatus, index: number) => {
+    setActiveStageIndex(index);
+    const colEl = document.getElementById(`kanban-col-${status}`);
+    if (colEl && columnsContainerRef.current) {
+      colEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+  };
 
   // Filtrar leads por búsqueda interna del Kanban
   const filteredLeads = useMemo(() => {
@@ -271,9 +281,41 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
       </div>
 
-      {/* Workspace de 5 Columnas — Amplitud Total sin Solapamiento */}
-      <div className="flex gap-3.5 sm:gap-4 items-stretch w-full overflow-x-auto pb-4 pt-1 scrollbar-thin scrollbar-thumb-slate-300">
-        {COLUMNS.map((col) => {
+      {/* Selector de Etapa Rápido en Móvil (Píldoras con Scroll Horizontal Suave) */}
+      <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 px-0.5">
+        {COLUMNS.map((col, idx) => {
+          const colLeads = filteredLeads.filter((l) => l.status === col.status);
+          const isSelected = activeStageIndex === idx;
+
+          return (
+            <button
+              key={col.status}
+              type="button"
+              onClick={() => scrollToStage(col.status, idx)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border active:scale-95 touch-manipulation ${
+                isSelected
+                  ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900/20'
+                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 shadow-2xs'
+              }`}
+            >
+              <span className={`w-2 h-2 rounded-full shrink-0 ${col.dotColor}`} />
+              <span>{col.title}</span>
+              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
+                isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+              }`}>
+                {colLeads.length}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Workspace de 5 Columnas — Amplitud Total con Scroll Snap en Móvil */}
+      <div 
+        ref={columnsContainerRef}
+        className="flex gap-3 sm:gap-4 items-stretch w-full overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-slate-300"
+      >
+        {COLUMNS.map((col, colIdx) => {
           const colLeads = filteredLeads.filter((l) => l.status === col.status);
           const colTotal = colLeads.reduce((acc, curr) => acc + (curr.amount || 0), 0);
           const isDropTarget = activeDropCol === col.status;
@@ -281,10 +323,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           return (
             <div
               key={col.status}
+              id={`kanban-col-${col.status}`}
               onDragOver={(e) => handleDragOver(e, col.status)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, col.status)}
-              className={`rounded-2xl border bg-slate-100/85 p-3.5 flex flex-col flex-1 min-w-[280px] xl:min-w-[260px] 2xl:min-w-0 transition-all h-[calc(100vh-215px)] min-h-[560px] ${
+              className={`rounded-2xl border bg-slate-100/90 p-3 sm:p-3.5 flex flex-col w-[86vw] max-w-[340px] shrink-0 snap-center sm:w-auto sm:flex-1 sm:min-w-[280px] xl:min-w-[260px] 2xl:min-w-0 transition-all h-[calc(100dvh-280px)] sm:h-[calc(100vh-215px)] min-h-[480px] sm:min-h-[560px] ${
                 isDropTarget
                   ? 'border-violet-500 bg-violet-50/70 ring-2 ring-violet-500/20 shadow-md'
                   : 'border-slate-200/90 shadow-2xs'
@@ -299,15 +342,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       {col.title}
                     </h3>
                   </div>
-                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200 shadow-2xs shrink-0">
-                    {colLeads.length}
-                  </span>
+                  <div className="flex items-center gap-1.5 shrink-0">
+                    <span className="sm:hidden text-[10px] font-semibold text-slate-400">
+                      {colIdx + 1}/5
+                    </span>
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200 shadow-2xs">
+                      {colLeads.length}
+                    </span>
+                  </div>
                 </div>
 
                 <div className="flex items-center justify-between text-[11px] text-slate-500">
                   <span className="truncate pr-1">{col.description}</span>
                   {colTotal > 0 && (
-                    <span className="font-mono font-bold text-slate-800 bg-white/70 px-1.5 py-0.5 rounded border border-slate-200 shrink-0">
+                    <span className="font-mono font-bold text-slate-800 bg-white/80 px-1.5 py-0.5 rounded border border-slate-200 shrink-0 shadow-2xs">
                       ${colTotal.toFixed(0)}
                     </span>
                   )}
@@ -319,7 +367,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 {colLeads.length === 0 ? (
                   <div className="h-36 flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-300 rounded-2xl text-slate-400 bg-white/50">
                     <p className="text-xs font-semibold text-slate-600">Sin clientes en esta fase</p>
-                    <p className="text-[11px] text-slate-400 mt-1">Arrastra una tarjeta aquí</p>
+                    <p className="text-[11px] text-slate-400 mt-1">Arrastra una tarjeta o usa las flechas</p>
                   </div>
                 ) : (
                   colLeads.map((lead) => {
@@ -343,7 +391,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                               href={`https://wa.me/${lead.phone}`}
                               target="_blank"
                               rel="noopener noreferrer"
-                              className="text-[11px] text-slate-500 hover:text-emerald-700 font-mono inline-flex items-center gap-1 transition-colors mt-0.5"
+                              className="text-[11px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200/70 font-mono inline-flex items-center gap-1 transition-colors mt-1 font-semibold"
                               title="Abrir chat en WhatsApp"
                             >
                               <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
@@ -370,25 +418,25 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                           )}
                         </div>
 
-                        {/* Controles de Avance Ergonómicos */}
+                        {/* Controles de Avance Ergonómicos (Touch Targets Amplios) */}
                         <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
                           <button
                             type="button"
                             onClick={() => handleStepMove(lead, 'back')}
                             disabled={!hasPrev}
-                            className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed border border-slate-200 text-slate-600 transition-all active:scale-95"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-25 disabled:cursor-not-allowed border border-slate-200/80 text-slate-700 transition-all active:scale-95 touch-manipulation shrink-0"
                             title="Retroceder etapa"
                           >
-                            <ChevronLeft className="w-3.5 h-3.5" />
+                            <ChevronLeft className="w-4 h-4" />
                           </button>
 
                           {lead.status === 'anticipo' ? (
                             <button
                               type="button"
                               onClick={() => onOpenSaleModal(lead)}
-                              className="flex-1 py-1.5 px-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[10px] flex items-center justify-center gap-1 shadow-sm transition-all active:scale-95"
+                              className="flex-1 h-9 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation"
                             >
-                              <CheckCircle2 className="w-3.5 h-3.5" />
+                              <CheckCircle2 className="w-4 h-4" />
                               <span>Cerrar Venta ➔</span>
                             </button>
                           ) : (
@@ -401,10 +449,10 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             type="button"
                             onClick={() => handleStepMove(lead, 'forward')}
                             disabled={!hasNext}
-                            className="p-1.5 rounded-lg bg-slate-50 hover:bg-slate-100 disabled:opacity-30 disabled:cursor-not-allowed border border-slate-200 text-slate-600 transition-all active:scale-95"
+                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-25 disabled:cursor-not-allowed border border-slate-200/80 text-slate-700 transition-all active:scale-95 touch-manipulation shrink-0"
                             title="Avanzar etapa"
                           >
-                            <ChevronRight className="w-3.5 h-3.5" />
+                            <ChevronRight className="w-4 h-4" />
                           </button>
                         </div>
 

@@ -68,25 +68,25 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
   };
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
       
       {/* Encabezado */}
-      <div className="bg-white p-5 rounded-3xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-            <span>Centro de Seguimiento Comercial & Reactivación</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
-              {pendingLeads.length} {pendingLeads.length === 1 ? 'contacto pendiente' : 'contactos pendientes'}
+          <h2 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>Centro de Seguimiento Comercial</span>
+            <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+              {pendingLeads.length} {pendingLeads.length === 1 ? 'contacto' : 'contactos'}
             </span>
           </h2>
           <p className="text-xs text-slate-500 mt-0.5">
-            Monitorea el tiempo de inactividad de cada prospecto y utiliza plantillas de alta conversión para WhatsApp.
+            Monitorea el tiempo de inactividad de cada prospecto y utiliza plantillas oficiales para WhatsApp.
           </p>
         </div>
       </div>
 
       {pendingLeads.length === 0 ? (
-        <div className="bg-white p-12 rounded-3xl border border-dashed border-slate-200 text-center space-y-2">
+        <div className="bg-white p-8 sm:p-12 rounded-2xl sm:rounded-3xl border border-dashed border-slate-200 text-center space-y-2">
           <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
           <h3 className="text-sm font-bold text-slate-800">¡Al día! No hay prospectos pendientes</h3>
           <p className="text-xs text-slate-500">
@@ -94,10 +94,41 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 sm:gap-6 items-start">
           
-          {/* Columna Izquierda: Lista de Clientes por Urgencia */}
-          <div className="lg:col-span-5 bg-white rounded-3xl border border-slate-200 shadow-sm p-4 space-y-3">
+          {/* Selector Horizontal Rápido para Celulares (Scroll con el Pulgar) */}
+          <div className="lg:hidden col-span-1 space-y-2">
+            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 block">
+              Seleccionar Prospecto:
+            </span>
+            <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
+              {pendingLeads.map((lead) => {
+                const isSelected = (selectedLead?.id === lead.id);
+                return (
+                  <button
+                    key={lead.id}
+                    type="button"
+                    onClick={() => setSelectedLeadId(lead.id)}
+                    className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border active:scale-95 touch-manipulation ${
+                      isSelected
+                        ? 'bg-violet-600 text-white border-violet-600 shadow-md ring-2 ring-violet-500/20'
+                        : 'bg-white text-slate-700 border-slate-200 shadow-2xs hover:bg-slate-50'
+                    }`}
+                  >
+                    <span>{lead.name}</span>
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
+                    }`}>
+                      +{lead.phone.slice(-4)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* Columna Izquierda: Lista de Clientes en Escritorio */}
+          <div className="hidden lg:block lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-4 space-y-3">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2">
               Prospectos por Atención
             </h3>
@@ -148,7 +179,7 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
 
           {/* Columna Derecha: Ficha de Seguimiento & Plantillas */}
           {selectedLead && (
-            <div className="lg:col-span-7 bg-white rounded-3xl border border-slate-200 shadow-sm p-6 space-y-5">
+            <div className="lg:col-span-7 bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-4 sm:p-6 space-y-4 sm:space-y-5">
               
               {/* Encabezado del Prospecto Seleccionado */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">

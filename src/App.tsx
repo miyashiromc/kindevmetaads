@@ -26,6 +26,7 @@ import { LeadCard } from './components/LeadCard';
 import { SaleModal } from './components/SaleModal';
 import { ConfigModal } from './components/ConfigModal';
 import { WhatsAppStatusModal } from './components/WhatsAppStatusModal';
+import { BottomNav } from './components/BottomNav';
 import { Toast, ToastData } from './components/Toast';
 
 const FALLBACK_STORAGE_KEY = 'kindev_leads_cache';
@@ -514,11 +515,11 @@ export const App: React.FC = () => {
           onToggleSidebarCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
         />
 
-        {/* Contenedor Principal */}
-        <main className={`flex-1 w-full transition-all ${
+        {/* Contenedor Principal con Espacio Seguro para Barra Inferior en Celular */}
+        <main className={`flex-1 w-full transition-all pb-24 lg:pb-8 ${
           activeTab === 'kanban'
-            ? 'p-3 sm:p-4 md:p-6 max-w-none space-y-4'
-            : 'p-4 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-6'
+            ? 'p-2.5 sm:p-4 md:p-6 max-w-none space-y-3 sm:space-y-4'
+            : 'p-3 sm:p-5 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6'
         }`}>
           
           {/* Banner informativo de modo prueba si está activo */}
@@ -739,7 +740,7 @@ export const App: React.FC = () => {
         </main>
 
         {/* Footer Empresarial Luminous */}
-        <footer className="border-t border-slate-200/80 bg-white py-3.5 px-6 mt-auto">
+        <footer className="border-t border-slate-200/80 bg-white py-3.5 px-4 sm:px-6 mt-auto mb-14 lg:mb-0">
           <div className={`${activeTab === 'kanban' ? 'w-full px-2' : 'max-w-7xl mx-auto'} flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2`}>
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="Kindev Logo" className="h-4 w-auto object-contain opacity-70" />
@@ -754,6 +755,15 @@ export const App: React.FC = () => {
         </footer>
 
       </div>
+
+      {/* Barra de Navegación Móvil Inferior (BottomNav Ergonómico al Alcance del Pulgar) */}
+      <BottomNav
+        activeTab={activeTab}
+        onSelectTab={(tab) => setActiveTab(tab)}
+        kanbanCount={leads.filter((l) => l.status !== 'descartado' && l.status !== 'cerrado').length}
+        closedCount={leads.filter((l) => l.status === 'cerrado').length}
+        followUpCount={leads.filter((l) => ['prospecto', 'cotizado', 'en_negociacion'].includes(l.status)).length}
+      />
 
       {/* Modal de Cierre de Venta */}
       <SaleModal

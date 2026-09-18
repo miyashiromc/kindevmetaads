@@ -67,16 +67,16 @@ export const TopBar: React.FC<TopBarProps> = ({
   });
 
   return (
-    <header className="bg-white/90 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-4 md:px-6 py-3.5 transition-all">
-      <div className="flex items-center justify-between gap-4">
+    <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-3 sm:px-6 py-2.5 sm:py-3.5 transition-all">
+      <div className="flex items-center justify-between gap-2.5 sm:gap-4">
         
         {/* Lado Izquierdo: Botón Menú Móvil / Toggle Escritorio + Título & Breadcrumb */}
-        <div className="flex items-center gap-3 min-w-0">
+        <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           {/* Menú Móvil */}
           <button
             type="button"
             onClick={onOpenSidebar}
-            className="lg:hidden p-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors shrink-0"
+            className="lg:hidden w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 transition-colors shrink-0 active:scale-95 touch-manipulation"
             title="Abrir menú"
           >
             <Menu className="w-5 h-5" />
@@ -99,26 +99,39 @@ export const TopBar: React.FC<TopBarProps> = ({
           )}
 
           <div className="min-w-0">
-            <div className="flex items-center gap-1.5 text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
+            <div className="flex items-center gap-1.5 text-[10px] sm:text-[11px] font-semibold text-slate-400 uppercase tracking-wider">
               <span>Panel</span>
               <span>/</span>
-              <span className="text-violet-600 font-bold">{current.title}</span>
+              <span className="text-violet-600 font-bold truncate">{current.title}</span>
             </div>
-            <h1 className="text-base md:text-lg font-black text-slate-900 tracking-tight truncate">
+            <h1 className="text-sm sm:text-base md:text-lg font-black text-slate-900 tracking-tight truncate leading-tight">
               {current.title}
             </h1>
           </div>
         </div>
 
         {/* Lado Derecho: Indicadores Rápidos & Acciones */}
-        <div className="flex items-center gap-2.5">
-          {/* Fecha Actual */}
+        <div className="flex items-center gap-1.5 sm:gap-2.5 shrink-0">
+          {/* Indicador WhatsApp Rápido en Celulares (Táctil) */}
+          <button
+            type="button"
+            onClick={onOpenWsStatus}
+            className="lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border bg-slate-50 active:scale-95 text-xs font-bold transition-all"
+            title="Estado WhatsApp"
+          >
+            <span className={`w-2 h-2 rounded-full ${isWsConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
+            <span className="text-[11px] font-mono text-slate-700">
+              {isWsConnected ? 'WS' : 'Offline'}
+            </span>
+          </button>
+
+          {/* Fecha Actual (Escritorio / Tablet) */}
           <div className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold">
             <Calendar className="w-3.5 h-3.5 text-slate-400" />
             <span className="capitalize">{todayStr}</span>
           </div>
 
-          {/* Estado Rápido WhatsApp */}
+          {/* Estado WhatsApp (Escritorio) */}
           <button
             type="button"
             onClick={onOpenWsStatus}
@@ -146,7 +159,7 @@ export const TopBar: React.FC<TopBarProps> = ({
           <button
             type="button"
             onClick={onAddNewLead}
-            className="py-2 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 shrink-0"
+            className="h-9 px-3 sm:px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-md transition-all active:scale-95 shrink-0 touch-manipulation"
           >
             <PlusCircle className="w-4 h-4 text-violet-400" />
             <span className="hidden sm:inline">Nuevo Contacto</span>

@@ -80,69 +80,68 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
   const totalProfit = totalRevenue - totalAdSpend;
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
       
       {/* Banner Ejecutivo de Inteligencia Meta */}
-      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 text-white shadow-xl border border-indigo-500/20 relative overflow-hidden">
+      <div className="bg-gradient-to-br from-slate-900 via-indigo-950 to-slate-900 rounded-2xl sm:rounded-3xl p-4 sm:p-6 text-white shadow-xl border border-indigo-500/20 relative overflow-hidden">
         <div className="absolute right-0 top-0 w-80 h-80 bg-violet-600/10 rounded-full blur-3xl pointer-events-none" />
         
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 sm:gap-6 relative z-10">
           <div className="space-y-2 max-w-xl">
             <div className="flex items-center gap-2">
               <span className="p-1.5 rounded-xl bg-violet-500/20 border border-violet-400/30 text-violet-300">
                 <Sparkles className="w-4 h-4" />
               </span>
-              <span className="text-xs font-bold text-violet-300 tracking-wider uppercase">
+              <span className="text-[10px] sm:text-xs font-bold text-violet-300 tracking-wider uppercase">
                 Inteligencia Predictiva Meta Ads
               </span>
             </div>
-            <h2 className="text-2xl font-black tracking-tight text-white">
-              Retorno Real de Inversión Publicitaria (ROAS)
+            <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
+              Retorno Real de Inversión (ROAS)
             </h2>
             <p className="text-xs text-slate-300 leading-relaxed">
-              Compara el dinero invertido en anuncios contra la facturación exacta en dólares registrada en tu CRM y despachada a Meta CAPI.
+              Compara el gasto en anuncios contra las compras reales verificadas en CRM y despachadas a Meta CAPI.
             </p>
           </div>
 
-          {/* Tarjeta de Métricas ROAS */}
-          <div className="flex items-center gap-4 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 shrink-0">
+          {/* Tarjeta de Métricas ROAS (Rejilla 2 Columnas en Celular) */}
+          <div className="grid grid-cols-2 gap-3 bg-white/10 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-white/10 shrink-0">
             <div className="space-y-0.5">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">ROAS Global</span>
-              <div className="text-3xl font-black font-mono text-emerald-400">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase block">ROAS Global</span>
+              <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-400">
                 {overallRoas}x
               </div>
-              <span className="text-[10px] text-emerald-300 font-semibold">
-                ${totalRevenue.toFixed(0)} facturados / ${totalAdSpend.toFixed(0)} invertidos
+              <span className="text-[9px] sm:text-[10px] text-emerald-300 font-semibold block truncate">
+                ${totalRevenue.toFixed(0)} / ${totalAdSpend.toFixed(0)} inv.
               </span>
             </div>
-            <div className="h-10 w-px bg-white/20" />
-            <div className="space-y-0.5">
-              <span className="text-[11px] font-bold text-slate-400 uppercase">Beneficio Neto</span>
-              <div className="text-3xl font-black font-mono text-white">
+            <div className="space-y-0.5 pl-3 border-l border-white/20">
+              <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase block">Ganancia Neta</span>
+              <div className="text-2xl sm:text-3xl font-black font-mono text-white">
                 +${totalProfit.toFixed(0)}
               </div>
-              <span className="text-[10px] text-slate-300">
-                Ganancia neta estimada
+              <span className="text-[9px] sm:text-[10px] text-slate-300 block truncate">
+                Beneficio estimado
               </span>
             </div>
           </div>
         </div>
 
         {/* Ajustador de Gasto Real para Cálculo */}
-        <div className="mt-6 pt-4 border-t border-white/10 flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="mt-5 pt-3.5 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 text-slate-300">
-            <Sliders className="w-4 h-4 text-violet-400" />
-            <span>Simulador de Inversión Publicitaria Total:</span>
+            <Sliders className="w-4 h-4 text-violet-400 shrink-0" />
+            <span>Simulador Inversión:</span>
             <span className="font-mono font-bold text-white">${totalAdSpend.toFixed(2)} USD</span>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex items-center gap-1.5 flex-wrap">
             {[30, 55, 100, 150].map((val) => (
               <button
                 key={val}
                 type="button"
                 onClick={() => setTotalAdSpend(val)}
-                className={`px-2.5 py-1 rounded-lg font-mono font-bold text-xs transition-all ${
+                className={`px-3 py-1 rounded-xl font-mono font-bold text-xs transition-all active:scale-95 ${
                   totalAdSpend === val
                     ? 'bg-violet-600 text-white shadow-sm'
                     : 'bg-white/10 hover:bg-white/20 text-slate-300'
@@ -155,13 +154,13 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
         </div>
       </div>
 
-      {/* Tabla Comparativa de Anuncios con Semáforos */}
-      <div className="bg-white rounded-3xl border border-slate-200 shadow-sm overflow-hidden space-y-4 p-5">
+      {/* Rendimiento por Anuncio */}
+      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs space-y-4 p-4 sm:p-5">
         <div>
-          <h3 className="text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
-            <span>Rendimiento y Recomendación por Anuncio</span>
-            <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
-              4 Creativos Activos
+          <h3 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+            <span>Rendimiento y Semáforo de Anuncios</span>
+            <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-slate-100 text-slate-700">
+              4 Creativos
             </span>
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
@@ -169,7 +168,78 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
           </p>
         </div>
 
-        <div className="overflow-x-auto">
+        {/* 1. Vista Móvil (Tarjetas Especiales para Celulares - Sin Scroll Horizontal) */}
+        <div className="block md:hidden space-y-3">
+          {adsData.map((ad) => {
+            const isWinner = ad.recommendation === 'scale';
+            const isNeutral = ad.recommendation === 'optimize';
+
+            return (
+              <div 
+                key={ad.id}
+                className={`p-3.5 rounded-2xl border transition-all space-y-3 ${
+                  isWinner 
+                    ? 'bg-emerald-50/40 border-emerald-200 shadow-2xs' 
+                    : isNeutral 
+                    ? 'bg-blue-50/30 border-blue-200' 
+                    : 'bg-rose-50/30 border-rose-200'
+                }`}
+              >
+                {/* Cabecera de la tarjeta móvil */}
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <span className="text-xs font-bold text-slate-900 block leading-snug">
+                      {ad.name}
+                    </span>
+                    <span className="inline-block text-[10px] font-semibold text-slate-500 bg-white px-2 py-0.5 rounded-md border border-slate-200/80 mt-1">
+                      {ad.format} • {ad.clicks} clics
+                    </span>
+                  </div>
+
+                  <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[10px] font-black shrink-0 ${
+                    isWinner 
+                      ? 'bg-emerald-600 text-white shadow-sm' 
+                      : isNeutral 
+                      ? 'bg-blue-600 text-white' 
+                      : 'bg-rose-600 text-white'
+                  }`}>
+                    {isWinner ? 'GANADOR' : isNeutral ? 'ESTABLE' : 'PERDEDOR'}
+                  </span>
+                </div>
+
+                {/* Grid de Métricas Móvil */}
+                <div className="grid grid-cols-4 gap-1.5 bg-white p-2 rounded-xl border border-slate-200/70 text-center text-xs">
+                  <div>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Gasto</span>
+                    <span className="font-mono font-bold text-slate-700">${ad.spendUsd.toFixed(0)}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Leads</span>
+                    <span className="font-mono font-bold text-slate-800">{ad.leadsCount}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Ventas</span>
+                    <span className="font-mono font-bold text-emerald-700">{ad.salesCount}</span>
+                  </div>
+                  <div>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase block">ROAS</span>
+                    <span className={`font-mono font-black ${isWinner ? 'text-emerald-600' : 'text-slate-800'}`}>
+                      {ad.roas > 0 ? `${ad.roas.toFixed(1)}x` : '0x'}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Texto de recomendación IA */}
+                <p className="text-[11px] text-slate-700 leading-snug bg-white/80 p-2 rounded-xl border border-slate-200/60 font-medium">
+                  {ad.recommendationText}
+                </p>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* 2. Vista Escritorio / Tablet (Tabla Detallada) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
               <tr className="border-b border-slate-200 text-slate-400 uppercase font-bold text-[10px] tracking-wider">

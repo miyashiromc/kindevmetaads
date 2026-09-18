@@ -72,78 +72,86 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
   ];
 
   return (
-    <div className="space-y-6 animate-fade-in">
+    <div className="space-y-4 sm:space-y-6 animate-fade-in">
       
-      {/* 4 KPIs Clave */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* 4 KPIs Clave — Rejilla 2x2 en Celulares */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Facturación Meta CAPI
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
+              Facturación CAPI
             </span>
-            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
-              ${totalRevenue.toFixed(2)}
-            </div>
-            <div className="text-[11px] text-emerald-600 font-bold flex items-center gap-1">
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>100% Verificado en Meta</span>
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/80 flex items-center justify-center shrink-0">
+              <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200 flex items-center justify-center shrink-0">
-            <DollarSign className="w-6 h-6" />
+          <div>
+            <div className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight truncate">
+              ${totalRevenue.toFixed(0)} <span className="text-xs text-slate-400 font-sans">USD</span>
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-emerald-600 font-bold flex items-center gap-1 mt-0.5 truncate">
+              <TrendingUp className="w-3 h-3 shrink-0" />
+              <span className="truncate">Verificado Meta</span>
+            </div>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Tasa de Conversión
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
+              Conversión
             </span>
-            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-violet-50 text-violet-600 border border-violet-200/80 flex items-center justify-center shrink-0">
+              <Award className="w-4 h-4 sm:w-5 sm:h-5" />
+            </div>
+          </div>
+          <div>
+            <div className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight">
               {conversionRate}%
             </div>
-            <div className="text-[11px] text-violet-600 font-bold flex items-center gap-1">
-              <Percent className="w-3.5 h-3.5" />
-              <span>{closedLeads.length} de {leads.length} leads cerrados</span>
+            <div className="text-[10px] sm:text-[11px] text-violet-600 font-bold flex items-center gap-1 mt-0.5 truncate">
+              <Percent className="w-3 h-3 shrink-0" />
+              <span className="truncate">{closedLeads.length} de {leads.length} cerrados</span>
             </div>
-          </div>
-          <div className="w-12 h-12 rounded-2xl bg-violet-50 text-violet-600 border border-violet-200 flex items-center justify-center shrink-0">
-            <Award className="w-6 h-6" />
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
               Ticket Promedio
             </span>
-            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
-              ${averageTicket.toFixed(2)}
-            </div>
-            <div className="text-[11px] text-slate-500 font-medium">
-              Por venta cerrada en USD
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/80 flex items-center justify-center shrink-0">
+              <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 border border-blue-200 flex items-center justify-center shrink-0">
-            <Activity className="w-6 h-6" />
+          <div>
+            <div className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight truncate">
+              ${averageTicket.toFixed(0)} <span className="text-xs text-slate-400 font-sans">USD</span>
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
+              Por venta cerrada
+            </div>
           </div>
         </div>
 
-        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm flex items-center justify-between">
-          <div className="space-y-1">
-            <span className="text-xs font-semibold text-slate-500 uppercase tracking-wider">
-              Pipeline Proyectado
+        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
+              Proyectado
             </span>
-            <div className="text-2xl font-black text-slate-900 font-mono tracking-tight">
-              ${projectedRevenue.toFixed(2)}
-            </div>
-            <div className="text-[11px] text-amber-600 font-bold">
-              {pendingLeads.length} en proceso de cierre
+            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0">
+              <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
-          <div className="w-12 h-12 rounded-2xl bg-amber-50 text-amber-600 border border-amber-200 flex items-center justify-center shrink-0">
-            <Layers className="w-6 h-6" />
+          <div>
+            <div className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight truncate">
+              ${projectedRevenue.toFixed(0)} <span className="text-xs text-slate-400 font-sans">USD</span>
+            </div>
+            <div className="text-[10px] sm:text-[11px] text-amber-600 font-bold truncate mt-0.5">
+              {pendingLeads.length} en negociación
+            </div>
           </div>
         </div>
 
@@ -153,7 +161,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         
         {/* Embudo de Conversión Visual */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
@@ -202,7 +210,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
         </div>
 
         {/* Desglose de Ventas por Tipo de Servicio */}
-        <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm space-y-4">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
