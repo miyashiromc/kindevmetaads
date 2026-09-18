@@ -32,6 +32,76 @@ function cleanPhone(raw) {
   return phone;
 }
 
+// Helper para resolver el número de teléfono real del remitente (desenmascarando LIDs de Meta Ads)
+async function resolveRealPhone(sock, msg) {
+  const remoteJid = msg.key?.remoteJid || '';
+  if (!remoteJid) return { phone: '', display: '' };
+
+  let resolved = '';
+
+  // 1. Si remoteJidAlt o participantAlt contiene el número real (@s.whatsapp.net)
+  const alt = msg.key?.remoteJidAlt || msg.key?.participantAlt;
+  if (alt && (alt.endsWith('@s.whatsapp.net') || alt.includes('@s.whatsapp.net'))) {
+    resolved = alt.split('@')[0].split(':')[0];
+  }
+
+  // 2. Si es un LID, consultar Baileys signalRepository.lidMapping
+  if (!resolved && remoteJid.endsWith('@lid') && sock?.signalRepository?.lidMapping) {
+    try {
+      const pn = await sock.signalRepository.lidMapping.getPNForLID(remoteJid);
+      if (pn) {
+        resolved = pn.split('@')[0].split(':')[0];
+      }
+    } catch (e) {
+      // ignore
+    }
+  }
+
+  // 3. Si aún no está resuelto y es un LID, consultar archivo de mapeo inverso en auth_baileys
+  if (!resolved && remoteJid.endsWith('@lid')) {
+    const lidUser = remoteJid.split('@')[0].split(':')[0];
+    const reverseFile = path.join(AUTH_DIR, `lid-mapping-${lidUser}_reverse.json`);
+    
+    // Si el archivo aún se está escribiendo, dar una breve pausa de 350ms
+    if (!fs.existsSync(reverseFile)) {
+      await new Promise((r) => setTimeout(r, 350));
+    }
+
+    if (fs.existsSync(reverseFile)) {
+      try {
+        const fileContent = JSON.parse(fs.readFileSync(reverseFile, 'utf-8'));
+        if (fileContent) {
+          resolved = String(fileContent).replace(/\D/g, '');
+        }
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  // 4. Si no es LID (mensaje normal de WhatsApp directo)
+  if (!resolved && !remoteJid.endsWith('@lid')) {
+    resolved = remoteJid.split('@')[0].split(':')[0];
+  }
+
+  // 5. Si después de todo aún no se pudo resolver, usar fallback
+  if (!resolved) {
+    resolved = remoteJid.split('@')[0].split(':')[0];
+  }
+
+  // Limpiar número y formatear
+  const clean = cleanPhone(resolved);
+  let display = clean;
+  if (clean.startsWith('593') && clean.length === 12) {
+    display = `+593 ${clean.slice(3, 5)} ${clean.slice(5, 8)} ${clean.slice(8)}`;
+  } else if (clean) {
+    display = `+${clean}`;
+  }
+
+  return { phone: clean, display };
+}
+
+
 // Estados globales del Gateway de WhatsApp
 let qrCodeDataUrl = '';
 let connectionStatus = 'initializing'; // 'initializing' | 'qr_ready' | 'connected' | 'reconnecting'
@@ -135,8 +205,8 @@ async function startWhatsAppBot() {
       const remoteJid = msg.key.remoteJid || '';
       if (remoteJid.endsWith('@g.us') || remoteJid.includes('status')) continue;
 
-      const rawNumber = remoteJid.replace('@s.whatsapp.net', '');
-      const phone = cleanPhone(rawNumber);
+      // Resolver el número telefónico real (desenmascara LIDs de anuncios de Meta Ads)
+      const { phone, display: displayPhone } = await resolveRealPhone(sock, msg);
       if (!phone) continue;
 
       // Evitar duplicar en la misma sesión si ya fue procesado
@@ -162,11 +232,11 @@ async function startWhatsAppBot() {
       const isFromAd = AD_KEYWORDS.some((kw) => lowerText.includes(kw));
 
       if (!isFromAd) {
-        console.log(`ℹ️ [WhatsApp Ignorado] Mensaje de ${pushName} (${phone}) no contiene términos del anuncio: "${text}"`);
+        console.log(`ℹ️ [WhatsApp Ignorado] Mensaje de ${pushName} (${displayPhone}) no contiene términos del anuncio: "${text}"`);
         continue;
       }
 
-      console.log(`🎯 [Lead de Publicidad Detectado!] De: ${pushName} (${phone}) - "${text}"`);
+      console.log(`🎯 [Lead de Publicidad Detectado!] De: ${pushName} | Teléfono Real: ${displayPhone} (JID: ${remoteJid}) - "${text}"`);
       registeredNumbers.add(phone);
 
       // Guardar directamente en Cloud Firestore
@@ -175,7 +245,7 @@ async function startWhatsAppBot() {
           fields: {
             name: { stringValue: pushName },
             phone: { stringValue: phone },
-            displayPhone: { stringValue: rawNumber },
+            displayPhone: { stringValue: displayPhone },
             service: { stringValue: 'Contacto Inicial WhatsApp' },
             notes: { stringValue: `Mensaje: "${text}"` },
             status: { stringValue: 'prospecto' },
