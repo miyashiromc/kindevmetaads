@@ -106,10 +106,39 @@ async function resolveRealPhone(sock, msg) {
 let qrCodeDataUrl = '';
 let connectionStatus = 'initializing'; // 'initializing' | 'qr_ready' | 'connected' | 'reconnecting'
 let connectedUser = '';
-let registeredNumbers = new Set();
 
-// Sincronizar estado en vivo con Cloud Firestore
-async function updateFirestoreStatus(status, user = '', note = '') {
+// Cache inteligente con expiración de 24h para deduplicar leads sin fugas de memoria
+const processedPhoneTimestamps = new Map();
+function isPhoneRecentlyProcessed(phone) {
+  const now = Date.now();
+  const lastTime = processedPhoneTimestamps.get(phone);
+  if (lastTime && (now - lastTime) < 24 * 60 * 60 * 1000) {
+    return true;
+  }
+  processedPhoneTimestamps.set(phone, now);
+  // Limpieza periódica preventiva
+  if (processedPhoneTimestamps.size > 1500) {
+    for (const [p, ts] of processedPhoneTimestamps.entries()) {
+      if (now - ts > 24 * 60 * 60 * 1000) processedPhoneTimestamps.delete(p);
+    }
+  }
+  return false;
+}
+
+// Sincronización inteligente con Cloud Firestore (Anti-desperdicio de cuotas)
+const HEARTBEAT_INTERVAL_MS = 4 * 60 * 1000; // 4 minutos en vez de 20 segundos
+let lastStatusWritten = '';
+let lastStatusWriteTime = 0;
+
+async function updateFirestoreStatus(status, user = '', note = '', force = false) {
+  const now = Date.now();
+  const statusKey = `${status}|${user}|${note}`;
+
+  // Si el estado no ha cambiado y aún no vence el heartbeat, NO gastar escritura en Firestore
+  if (!force && statusKey === lastStatusWritten && (now - lastStatusWriteTime < HEARTBEAT_INTERVAL_MS)) {
+    return;
+  }
+
   try {
     const payload = {
       fields: {
@@ -125,17 +154,19 @@ async function updateFirestoreStatus(status, user = '', note = '') {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)
     });
+    lastStatusWritten = statusKey;
+    lastStatusWriteTime = now;
   } catch (err) {
     // Silencioso
   }
 }
 
-// Heartbeat periódico cada 20s para informar que el servidor está vivo
+// Heartbeat eficiente cada 4 minutos para mantener la presencia activa en la nube
 setInterval(() => {
   if (connectionStatus === 'connected') {
-    updateFirestoreStatus('connected', connectedUser, 'Escuchador activo en segundo plano');
+    updateFirestoreStatus('connected', connectedUser, 'Escuchador activo en segundo plano', true);
   }
-}, 20000);
+}, HEARTBEAT_INTERVAL_MS);
 
 // Iniciar Baileys WhatsApp Socket
 async function startWhatsAppBot() {
@@ -209,8 +240,8 @@ async function startWhatsAppBot() {
       const { phone, display: displayPhone } = await resolveRealPhone(sock, msg);
       if (!phone) continue;
 
-      // Evitar duplicar en la misma sesión si ya fue procesado
-      if (registeredNumbers.has(phone)) continue;
+      // Evitar duplicar en ventana de 24h
+      if (isPhoneRecentlyProcessed(phone)) continue;
 
       const pushName = msg.pushName || 'Cliente WhatsApp';
       const text =
@@ -237,7 +268,6 @@ async function startWhatsAppBot() {
       }
 
       console.log(`🎯 [Lead de Publicidad Detectado!] De: ${pushName} | Teléfono Real: ${displayPhone} (JID: ${remoteJid}) - "${text}"`);
-      registeredNumbers.add(phone);
 
       // Guardar directamente en Cloud Firestore
       try {
@@ -420,4 +450,12 @@ app.get('*', (req, res) => {
 app.listen(PORT, () => {
   console.log(`🚀 [Kindev CAPI & WhatsApp Server] Activo en puerto ${PORT}`);
   console.log(`👉 Abre en tu navegador para escanear el QR: http://localhost:${PORT}/qr`);
+});
+
+// Protección contra caídas accidentales del proceso Node.js
+process.on('uncaughtException', (err) => {
+  console.error('⚠️ [Kindev Daemon - Excepción no capturada]:', err?.message || err);
+});
+process.on('unhandledRejection', (reason) => {
+  console.error('⚠️ [Kindev Daemon - Promesa rechazada]:', reason);
 });

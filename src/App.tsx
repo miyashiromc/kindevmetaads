@@ -277,7 +277,8 @@ export const App: React.FC = () => {
         if (snap.exists()) {
           const data = snap.data();
           const lastUpdate = data.updatedAt ? new Date(data.updatedAt).getTime() : 0;
-          const isRecent = Date.now() - lastUpdate < 65000;
+          // Ventana de validez de 6 minutos acorde al heartbeat optimizado
+          const isRecent = Date.now() - lastUpdate < (6 * 60 * 1000);
           const isConn = data.status === 'connected' && isRecent;
 
           setWsStatus({
@@ -294,13 +295,19 @@ export const App: React.FC = () => {
       }
     );
 
-    // 2. Consulta rápida inmediata al localhost
-    refreshWhatsAppStatus();
-    const interval = setInterval(refreshWhatsAppStatus, 15000);
+    // 2. Consulta al localhost SOLO si el navegador está en la máquina local (evita errores en celulares)
+    const isLocalEnvironment = typeof window !== 'undefined' && 
+      (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1');
+
+    let interval: NodeJS.Timeout | undefined;
+    if (isLocalEnvironment) {
+      refreshWhatsAppStatus();
+      interval = setInterval(refreshWhatsAppStatus, 30000);
+    }
 
     return () => {
       unsubscribe();
-      clearInterval(interval);
+      if (interval) clearInterval(interval);
     };
   }, [isUnlocked]);
 
