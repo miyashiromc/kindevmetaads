@@ -17,7 +17,10 @@ import {
   Activity,
   Mic,
   ShieldCheck,
-  Radio
+  Radio,
+  TrendingUp,
+  Zap,
+  Eye
 } from 'lucide-react';
 import { Lead, MetaLiveTelemetry } from '../types';
 
@@ -129,6 +132,8 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
 
   // Frecuencia calculada: 3466 impresiones / 2930 alcance = 1.18
   const adFrequency = 1.18;
+  // Posición del indicador en el tacómetro (normalizado a % de la barra)
+  const tachometerPosition = Math.min(((adFrequency - 1.0) / (2.5 - 1.0)) * 100, 100);
 
   // Guión de Nota de Voz
   const audioVoiceScript = `¡Hola! Qué gusto saludarte. Vi que te interesa tu página web profesional por $120 USD. Cuéntame brevemente: ¿cuál es el nombre y giro de tu negocio o empresa? Así te muestro un ejemplo similar de nuestro portafolio de Kindev de inmediato para que veas la calidad antes de decidir.`;
@@ -137,17 +142,20 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
   const objectionScripts = [
     {
       id: 'obj_precio',
-      title: 'Objeción: "¿Tiene algún descuento o cuánto es lo último?"',
+      emoji: '💰',
+      title: '\"¿Tiene algún descuento o cuánto es lo último?\"',
       text: `El precio de $120 USD ya incluye una tarifa de promoción de lanzamiento para PYMEs. Es un pago 100% único, sin mensualidades ni cobros ocultos por mantenimiento básico. Incluye tus 5 secciones, botón de WhatsApp directo y diseño adaptado a celulares. Para agendarte hoy solo iniciamos con un anticipo del 50% ($60 USD) y el saldo contra entrega aprobada.`
     },
     {
       id: 'obj_incluye',
-      title: 'Objeción: "¿Qué incluye exactamente el sitio web?"',
+      emoji: '📦',
+      title: '\"¿Qué incluye exactamente el sitio web?\"',
       text: `Tu proyecto por $120 USD incluye:\n1. Hasta 5 secciones (Inicio, Nosotros, Servicios/Catálogo, Testimonios y Contacto).\n2. Botón flotante a tu WhatsApp para cerrar ventas directas.\n3. Formulario de contacto y mapa interactivo.\n4. Carga ultra rápida optimizada para celulares.\n5. Vinculación con tus redes sociales.\n¿Tienes listo el logotipo de tu negocio o te ayudamos a prepararlo?`
     },
     {
       id: 'obj_pensarlo',
-      title: 'Objeción: "Déjame pensarlo / Te aviso después"',
+      emoji: '🤔',
+      title: '\"Déjame pensarlo / Te aviso después\"',
       text: `¡Claro que sí! Con gusto. Solo te dejo este dato: mientras lo piensas, tus clientes potenciales te están buscando en Google y redes sociales. Te dejo este enlace de demostración de nuestro portafolio para que veas cómo luciría tu marca: https://kindev.tech. Si arrancamos esta semana, te la entregamos lista y funcionando en 3 a 5 días hábiles.`
     }
   ];
@@ -169,7 +177,8 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
       id: 'ev_1',
       time: 'Hace 15 min',
       badge: 'CAPI Lead',
-      badgeColor: 'bg-emerald-100 text-emerald-800 border-emerald-200',
+      badgeColor: 'bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20',
+      dotColor: 'bg-emerald-500',
       title: 'Evento CAPI "Lead" confirmado por Meta Graph v19.0',
       detail: 'Trace ID: AYToUQgFUNkUUDrXvI5GHPV • Dataset 1368429478371391'
     },
@@ -177,7 +186,8 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
       id: 'ev_2',
       time: 'Hace 38 min',
       badge: 'Ad Rule Kill Switch',
-      badgeColor: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+      badgeColor: 'bg-indigo-500/10 text-indigo-700 ring-1 ring-indigo-500/20',
+      dotColor: 'bg-indigo-500',
       title: 'Regla Kill Switch evaluada en servidores de Meta',
       detail: 'Costo por mensaje en $1.40 USD (Bajo umbral de seguridad de $2.50 USD)'
     },
@@ -185,7 +195,8 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
       id: 'ev_3',
       time: 'Hace 1h 10m',
       badge: 'CAPI Purchase',
-      badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
+      badgeColor: 'bg-amber-500/10 text-amber-700 ring-1 ring-amber-500/20',
+      dotColor: 'bg-amber-500',
       title: 'Evento CAPI "Purchase" ($120.00 USD) recibido en Meta',
       detail: 'Trace ID: A7i9B6FcqmjoCo5wna5Pfwl • Calibración de algoritmo completada'
     },
@@ -193,7 +204,8 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
       id: 'ev_4',
       time: 'Hace 2h 45m',
       badge: 'Instagram',
-      badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+      badgeColor: 'bg-fuchsia-500/10 text-fuchsia-700 ring-1 ring-fuchsia-500/20',
+      dotColor: 'bg-fuchsia-500',
       title: 'Conversación iniciada desde Instagram Stories (Quito)',
       detail: 'Coste registrado: $1.24 USD • Frecuencia acumulada: 1.18'
     },
@@ -201,45 +213,62 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
       id: 'ev_5',
       time: 'Hace 4h',
       badge: 'Alerta Preventiva',
-      badgeColor: 'bg-blue-100 text-blue-800 border-blue-200',
+      badgeColor: 'bg-sky-500/10 text-sky-700 ring-1 ring-sky-500/20',
+      dotColor: 'bg-sky-500',
       title: 'Regla de Notificación ID 1480910183909016 activa',
       detail: 'Monitoreando desviaciones superiores a $2.20 USD por resultado'
     }
   ];
 
+  // Subtab config para DRY
+  const subTabs: { id: SubTab; label: string; icon: React.ReactNode; color: string }[] = [
+    { id: 'resumen', label: 'Vista Ejecutiva', icon: <Sparkles className="w-3.5 h-3.5" />, color: 'text-indigo-500' },
+    { id: 'mapa_ciudades', label: 'Mapa & Ciudades', icon: <Clock className="w-3.5 h-3.5" />, color: 'text-amber-500' },
+    { id: 'scripts_cierre', label: 'Guiones de Cierre', icon: <Mic className="w-3.5 h-3.5" />, color: 'text-rose-500' },
+    { id: 'reglas_live', label: 'Kill Switch & Feed', icon: <ShieldAlert className="w-3.5 h-3.5" />, color: 'text-emerald-500' },
+  ];
+
+  // Funnel data para renderizado dinámico
+  const funnelSteps = [
+    { label: 'Clics en el Anuncio', sublabel: 'Interés Inicial', value: telemetry.campaign.clicks, pct: 100, color: 'from-indigo-500 to-violet-500' },
+    { label: 'Abrieron WhatsApp', sublabel: 'Link Click', value: telemetry.campaign.linkClicks, pct: 55.7, color: 'from-violet-500 to-purple-500' },
+    { label: 'Conversación Iniciada', sublabel: 'Primer Mensaje', value: telemetry.campaign.messagingConnections, pct: 24.6, color: 'from-emerald-500 to-teal-500' },
+    { label: 'Conversación Activa', sublabel: '>2 Mensajes', value: telemetry.campaign.depth2Replies, pct: 6.6, color: 'from-emerald-600 to-emerald-500', bottleneck: true },
+  ];
+
   return (
-    <div className="space-y-5 sm:space-y-6 animate-fade-in pb-12">
+    <div className="space-y-4 sm:space-y-5 animate-fade-in pb-12">
       
-      {/* 1. Barra de Telemetría Superior */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-white p-3.5 sm:p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+      {/* ═══ BARRA DE TELEMETRÍA SUPERIOR ═══ */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 glass-card p-3 sm:p-4 rounded-2xl border border-slate-200/70 shadow-sm">
         <div className="flex items-center gap-3">
           <div className="relative flex items-center justify-center">
-            <span className="w-3 h-3 rounded-full bg-emerald-500 animate-ping absolute" />
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 relative" />
+            <span className="w-3 h-3 rounded-full bg-emerald-500 animate-ping absolute opacity-75" />
+            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500 relative ring-2 ring-emerald-500/20" />
           </div>
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs font-black text-slate-900 tracking-tight">
                 Meta Graph API v19.0
               </span>
-              <span className="px-1.5 py-0.5 rounded-md bg-emerald-50 text-emerald-700 border border-emerald-200 text-[10px] font-bold">
+              <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20 text-[10px] font-bold tracking-wide">
                 EN VIVO
               </span>
             </div>
-            <p className="text-[11px] text-slate-500 font-medium">
-              Cuenta: <code className="font-mono text-slate-700 font-semibold">Kindev Ads (4362799907368161)</code>
+            <p className="text-[11px] text-slate-500 font-medium mt-0.5">
+              <code className="font-mono text-slate-600 font-semibold text-[10px]">Kindev Ads • act_436...8161</code>
             </p>
           </div>
         </div>
 
         <div className="flex items-center gap-2 self-end sm:self-auto">
-          <div className="inline-flex p-0.5 rounded-xl bg-slate-100 border border-slate-200 text-[11px] font-bold">
+          <div className="inline-flex p-0.5 rounded-xl bg-slate-100/80 border border-slate-200/60 text-[11px] font-bold">
             <button
               type="button"
               onClick={() => setViewMode('live')}
-              className={`px-3 py-1 rounded-lg transition-all ${
+              className={`px-3 py-1.5 rounded-[10px] transition-all duration-200 ${
                 viewMode === 'live' 
-                  ? 'bg-white text-slate-900 shadow-2xs' 
+                  ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/50' 
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -248,9 +277,9 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
             <button
               type="button"
               onClick={() => setViewMode('simulator')}
-              className={`px-3 py-1 rounded-lg transition-all ${
+              className={`px-3 py-1.5 rounded-[10px] transition-all duration-200 ${
                 viewMode === 'simulator' 
-                  ? 'bg-white text-slate-900 shadow-2xs' 
+                  ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/50' 
                   : 'text-slate-500 hover:text-slate-700'
               }`}
             >
@@ -262,7 +291,7 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
             type="button"
             onClick={() => fetchLiveInsights(true)}
             disabled={isLoading}
-            className="p-2 rounded-xl border border-slate-200 hover:bg-slate-50 text-slate-600 transition-all active:scale-95 disabled:opacity-50"
+            className="p-2 rounded-xl border border-slate-200/60 hover:bg-slate-50 text-slate-500 hover:text-indigo-600 transition-all active:scale-95 disabled:opacity-50"
             title="Sincronizar métricas con Meta Graph API"
           >
             <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin text-indigo-600' : ''}`} />
@@ -270,162 +299,108 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
         </div>
       </div>
 
-      {/* 2. Selector Ergonómico de Sub-Pestañas Visuales */}
-      <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-200/60 border border-slate-200 overflow-x-auto text-xs font-bold scrollbar-none">
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('resumen')}
-          className={`px-3.5 py-2 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeSubTab === 'resumen'
-              ? 'bg-white text-slate-900 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Sparkles className="w-3.5 h-3.5 text-indigo-600" />
-          <span>Vista Ejecutiva & Embudo</span>
-        </button>
+      {/* ═══ SUB-TAB NAVIGATION ═══ */}
+      <nav className="flex items-center gap-1 p-1 rounded-2xl bg-slate-100/60 border border-slate-200/50 overflow-x-auto scrollbar-none text-xs font-bold">
+        {subTabs.map((tab) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => setActiveSubTab(tab.id)}
+            className={`px-3.5 py-2 rounded-xl transition-all duration-200 whitespace-nowrap flex items-center gap-1.5 relative ${
+              activeSubTab === tab.id
+                ? 'bg-white text-slate-900 shadow-sm ring-1 ring-slate-200/50'
+                : 'text-slate-500 hover:text-slate-800 hover:bg-white/50'
+            }`}
+          >
+            <span className={activeSubTab === tab.id ? tab.color : ''}>{tab.icon}</span>
+            <span>{tab.label}</span>
+            {activeSubTab === tab.id && (
+              <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-5 h-0.5 rounded-full bg-indigo-500" />
+            )}
+          </button>
+        ))}
+      </nav>
 
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('mapa_ciudades')}
-          className={`px-3.5 py-2 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeSubTab === 'mapa_ciudades'
-              ? 'bg-white text-slate-900 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Clock className="w-3.5 h-3.5 text-amber-600" />
-          <span>Mapa Horario & Ciudades</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('scripts_cierre')}
-          className={`px-3.5 py-2 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeSubTab === 'scripts_cierre'
-              ? 'bg-white text-slate-900 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <Mic className="w-3.5 h-3.5 text-rose-600" />
-          <span>Guiones de Cierre & Nota de Voz</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('reglas_live')}
-          className={`px-3.5 py-2 rounded-xl transition-all whitespace-nowrap flex items-center gap-1.5 ${
-            activeSubTab === 'reglas_live'
-              ? 'bg-white text-slate-900 shadow-2xs'
-              : 'text-slate-600 hover:text-slate-900'
-          }`}
-        >
-          <ShieldAlert className="w-3.5 h-3.5 text-emerald-600" />
-          <span>Kill Switch & Feed en Vivo</span>
-        </button>
-      </div>
-
-      {/* ========================================================================= */}
-      {/* VISTA 1: RESUMEN EJECUTIVO, EMBUDO & PLATAFORMAS                           */}
-      {/* ========================================================================= */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* VISTA 1: RESUMEN EJECUTIVO, EMBUDO & PLATAFORMAS                  */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeSubTab === 'resumen' && (
-        <div className="space-y-5 sm:space-y-6 animate-fade-in">
+        <div className="space-y-4 sm:space-y-5 stagger-children">
           
-          {/* Hero Card Ejecutivo */}
-          <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-indigo-950 rounded-2xl sm:rounded-3xl p-5 sm:p-7 text-white shadow-xl border border-indigo-500/20 relative overflow-hidden">
-            <div className="absolute right-0 top-0 w-96 h-96 bg-indigo-600/15 rounded-full blur-3xl pointer-events-none" />
+          {/* ─── Hero Card Ejecutivo ─── */}
+          <div className="bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 bg-gradient-animated rounded-2xl sm:rounded-3xl p-5 sm:p-7 text-white shadow-xl relative overflow-hidden animate-slide-up">
+            {/* Decorative orbs */}
+            <div className="absolute right-[-40px] top-[-40px] w-80 h-80 bg-indigo-600/20 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute left-[-60px] bottom-[-60px] w-64 h-64 bg-violet-600/15 rounded-full blur-3xl pointer-events-none" />
+            <div className="absolute right-1/3 top-1/2 w-32 h-32 bg-emerald-500/10 rounded-full blur-2xl pointer-events-none" />
             
             <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
-              <div className="space-y-2 max-w-xl">
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300">
+              <div className="space-y-2.5 max-w-xl">
+                <div className="flex items-center gap-2.5">
+                  <span className="p-1.5 rounded-xl bg-indigo-500/20 border border-indigo-400/20 text-indigo-300 animate-pulse-glow">
                     <Sparkles className="w-4 h-4" />
                   </span>
-                  <span className="text-[11px] font-bold text-indigo-300 tracking-wider uppercase">
+                  <span className="text-[11px] font-bold text-indigo-300/90 tracking-widest uppercase">
                     {viewMode === 'live' ? 'Campaña en Vivo' : 'Simulador Proyectado'}
                   </span>
                 </div>
                 <h2 className="text-xl sm:text-2xl font-black tracking-tight text-white leading-tight">
                   {telemetry.campaign.name}
                 </h2>
-                <p className="text-xs text-slate-300 leading-relaxed">
-                  Métricas auditadas en tiempo real. Presupuesto diario configurado: <strong>$7,00 USD</strong>.
+                <p className="text-[11px] text-slate-400 leading-relaxed flex items-center gap-2">
+                  <Eye className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                  <span>{telemetry.campaign.impressions.toLocaleString()} impresiones • Presupuesto diario: <strong className="text-slate-300">$7,00 USD</strong></span>
                 </p>
               </div>
 
-              {/* Tarjeta de Métricas ROAS */}
-              <div className="grid grid-cols-2 gap-4 bg-white/10 backdrop-blur-md p-4 rounded-2xl border border-white/10 shrink-0">
-                <div className="space-y-1">
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase block">ROAS Real</span>
-                  <div className="text-2xl sm:text-3xl font-black font-mono text-emerald-400">
+              {/* ROAS & Spend Cards */}
+              <div className="grid grid-cols-2 gap-px rounded-2xl overflow-hidden ring-1 ring-white/10 shrink-0">
+                <div className="bg-white/[0.07] backdrop-blur-sm p-4 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">ROAS Real</span>
+                  <div className="text-3xl sm:text-4xl font-black font-mono bg-gradient-to-r from-emerald-400 to-emerald-300 text-gradient">
                     {overallRoas}x
                   </div>
-                  <span className="text-[10px] text-emerald-300 font-semibold block truncate">
-                    ${totalRevenue.toFixed(0)} facturado
+                  <span className="text-[10px] text-emerald-400/80 font-semibold block">
+                    <TrendingUp className="w-3 h-3 inline mr-1" />${totalRevenue.toFixed(0)} facturado
                   </span>
                 </div>
-                <div className="space-y-1 pl-4 border-l border-white/20">
-                  <span className="text-[10px] sm:text-[11px] font-bold text-slate-400 uppercase block">Inversión Meta</span>
-                  <div className="text-2xl sm:text-3xl font-black font-mono text-white">
+                <div className="bg-white/[0.07] backdrop-blur-sm p-4 space-y-1">
+                  <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wider block">Inversión Meta</span>
+                  <div className="text-3xl sm:text-4xl font-black font-mono text-white">
                     ${currentSpend.toFixed(2)}
                   </div>
-                  <span className="text-[10px] text-slate-300 block truncate">
+                  <span className="text-[10px] text-slate-400 block">
                     {telemetry.campaign.messagingConnections} prospectos WhatsApp
                   </span>
                 </div>
               </div>
             </div>
 
-            {/* 4 KPIs de Rendimiento */}
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5 mt-5 border-t border-white/10">
-              <div className="bg-white/5 p-3 rounded-xl border border-white/10">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold uppercase mb-1">
-                  <DollarSign className="w-3.5 h-3.5 text-amber-400" />
-                  <span>Coste / Mensaje</span>
+            {/* 4 KPIs Strip */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-5 mt-5 border-t border-white/[0.06]">
+              {[
+                { icon: <DollarSign className="w-3.5 h-3.5" />, iconColor: 'text-amber-400', label: 'Coste / Msg', value: `$${telemetry.campaign.costPerMessage.toFixed(2)}`, sub: 'Mediana similar: $0.49' },
+                { icon: <MousePointerClick className="w-3.5 h-3.5" />, iconColor: 'text-sky-400', label: 'Clics', value: telemetry.campaign.clicks.toString(), sub: `CPC: $${telemetry.campaign.cpc.toFixed(2)} USD` },
+                { icon: <MessageSquare className="w-3.5 h-3.5" />, iconColor: 'text-emerald-400', label: 'Mensajes', value: telemetry.campaign.messagingConnections.toString(), sub: '100% Hombres (25-54)' },
+                { icon: <Flame className="w-3.5 h-3.5" />, iconColor: 'text-violet-400', label: 'Ganancia', value: `+$${totalProfit.toFixed(0)}`, sub: 'Margen sobre ad spend', valueColor: 'text-emerald-400' },
+              ].map((kpi, idx) => (
+                <div key={idx} className="group bg-white/[0.04] hover:bg-white/[0.08] p-3 rounded-xl border border-white/[0.06] transition-all duration-200 cursor-default">
+                  <div className="flex items-center gap-1.5 text-slate-500 text-[10px] font-bold uppercase mb-1.5">
+                    <span className={kpi.iconColor}>{kpi.icon}</span>
+                    <span>{kpi.label}</span>
+                  </div>
+                  <span className={`text-lg font-black font-mono ${kpi.valueColor || 'text-white'}`}>
+                    {kpi.value}
+                  </span>
+                  <span className="text-[9px] text-slate-500 block mt-0.5">{kpi.sub}</span>
                 </div>
-                <span className="text-lg font-black font-mono text-white">
-                  ${telemetry.campaign.costPerMessage.toFixed(2)}
-                </span>
-                <span className="text-[9px] text-slate-400 block mt-0.5">Mediana similar: $0.49</span>
-              </div>
-
-              <div className="bg-white/5 p-3 rounded-xl border border-white/10">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold uppercase mb-1">
-                  <MousePointerClick className="w-3.5 h-3.5 text-sky-400" />
-                  <span>Clics al Anuncio</span>
-                </div>
-                <span className="text-lg font-black font-mono text-white">
-                  {telemetry.campaign.clicks}
-                </span>
-                <span className="text-[9px] text-sky-300 block mt-0.5">CPC: ${telemetry.campaign.cpc.toFixed(2)} USD</span>
-              </div>
-
-              <div className="bg-white/5 p-3 rounded-xl border border-white/10">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold uppercase mb-1">
-                  <MessageSquare className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Mensajes Iniciados</span>
-                </div>
-                <span className="text-lg font-black font-mono text-white">
-                  {telemetry.campaign.messagingConnections}
-                </span>
-                <span className="text-[9px] text-emerald-300 block mt-0.5">100% Hombres (25-54)</span>
-              </div>
-
-              <div className="bg-white/5 p-3 rounded-xl border border-white/10">
-                <div className="flex items-center gap-1.5 text-slate-400 text-[10px] font-bold uppercase mb-1">
-                  <Flame className="w-3.5 h-3.5 text-violet-400" />
-                  <span>Ganancia Neta</span>
-                </div>
-                <span className="text-lg font-black font-mono text-emerald-400">
-                  +${totalProfit.toFixed(0)}
-                </span>
-                <span className="text-[9px] text-slate-300 block mt-0.5">Margen sobre ad spend</span>
-              </div>
+              ))}
             </div>
 
+            {/* Simulador Slider */}
             {viewMode === 'simulator' && (
-              <div className="mt-5 pt-4 border-t border-white/10 flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-fade-in">
-                <div className="flex items-center gap-2 text-slate-300">
+              <div className="mt-5 pt-4 border-t border-white/[0.06] flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-fade-in">
+                <div className="flex items-center gap-2 text-slate-400">
                   <Sliders className="w-4 h-4 text-violet-400 shrink-0" />
                   <span>Inversión Simulada:</span>
                   <span className="font-mono font-bold text-white">${totalAdSpend.toFixed(2)} USD</span>
@@ -439,8 +414,8 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
                       onClick={() => setTotalAdSpend(val)}
                       className={`px-3 py-1 rounded-xl font-mono font-bold text-xs transition-all active:scale-95 ${
                         totalAdSpend === val
-                          ? 'bg-violet-600 text-white shadow-sm'
-                          : 'bg-white/10 hover:bg-white/20 text-slate-300'
+                          ? 'bg-violet-600 text-white shadow-md shadow-violet-500/30'
+                          : 'bg-white/[0.08] hover:bg-white/[0.15] text-slate-400'
                       }`}
                     >
                       ${val}
@@ -451,149 +426,158 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
             )}
           </div>
 
-          {/* Embudo Visual de Deserción */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-5">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="p-1.5 rounded-lg bg-amber-50 text-amber-600 border border-amber-200">
-                    <Target className="w-4 h-4" />
-                  </span>
-                  <h3 className="text-base font-black text-slate-900 tracking-tight">
-                    Embudo Visual de Deserción en WhatsApp
-                  </h3>
+          {/* ─── Embudo Visual de Deserción ─── */}
+          <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-5 animate-slide-up">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100/80 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20">
+                  <Target className="w-4 h-4" />
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Diagnóstico visual del recorrido desde el clic del anuncio hasta la interacción profunda.
-                </p>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                    Embudo de Deserción WhatsApp
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Recorrido del clic hasta la interacción profunda
+                  </p>
+                </div>
               </div>
 
-              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-rose-50 text-rose-700 border border-rose-200 text-xs font-bold shrink-0">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-500/10 text-rose-700 ring-1 ring-rose-500/20 text-xs font-bold shrink-0">
                 <AlertTriangle className="w-3.5 h-3.5" />
-                <span>Fuga Crítica: 73.3% de Abandono</span>
+                <span>Fuga: 73.3% Abandono</span>
               </div>
             </div>
 
             <div className="space-y-3">
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-700">1. Clics en el Anuncio (Interés Inicial)</span>
-                  <span className="font-mono text-slate-900">{telemetry.campaign.clicks} personas (100%)</span>
+              {funnelSteps.map((step, idx) => (
+                <div key={idx} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="font-bold text-slate-700 flex items-center gap-2">
+                      <span className="w-5 h-5 rounded-lg bg-slate-100 flex items-center justify-center text-[10px] font-black text-slate-600">{idx + 1}</span>
+                      <span>{step.label}</span>
+                      <span className="text-[10px] text-slate-400 font-medium hidden sm:inline">({step.sublabel})</span>
+                      {step.bottleneck && (
+                        <span className="px-1.5 py-0.5 rounded-md bg-rose-500/10 text-rose-700 ring-1 ring-rose-500/20 text-[10px] font-bold">
+                          Cuello de Botella
+                        </span>
+                      )}
+                    </span>
+                    <span className={`font-mono font-black text-xs ${step.bottleneck ? 'text-rose-700' : 'text-slate-800'}`}>
+                      {step.value} ({step.pct}%)
+                    </span>
+                  </div>
+                  <div className="w-full h-2.5 rounded-full bg-slate-100/80 overflow-hidden">
+                    <div 
+                      className={`h-full bg-gradient-to-r ${step.color} rounded-full animate-bar-fill`}
+                      style={{ '--bar-width': `${step.pct}%`, width: `${step.pct}%` } as React.CSSProperties}
+                    />
+                  </div>
                 </div>
-                <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full bg-indigo-500 rounded-full transition-all duration-500" style={{ width: '100%' }} />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-700">2. Clics que abrieron WhatsApp</span>
-                  <span className="font-mono text-indigo-700">{telemetry.campaign.linkClicks} personas (55.7%)</span>
-                </div>
-                <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full bg-indigo-600 rounded-full transition-all duration-500" style={{ width: '55.7%' }} />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-700">3. Conversación Iniciada ("Quiero hablar con un asesor")</span>
-                  <span className="font-mono text-emerald-700">{telemetry.campaign.messagingConnections} chats (24.6%)</span>
-                </div>
-                <div className="w-full h-3 rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full bg-emerald-500 rounded-full transition-all duration-500" style={{ width: '24.6%' }} />
-                </div>
-              </div>
-
-              <div className="space-y-1">
-                <div className="flex items-center justify-between text-xs font-bold">
-                  <span className="text-slate-900 font-extrabold flex items-center gap-1.5">
-                    <span>4. Conversación Activa (&gt;2 mensajes)</span>
-                    <span className="px-1.5 py-0.2 rounded bg-rose-100 text-rose-800 text-[10px]">Cuello de Botella</span>
-                  </span>
-                  <span className="font-mono text-emerald-800 font-black">{telemetry.campaign.depth2Replies} prospectos (6.6%)</span>
-                </div>
-                <div className="w-full h-3.5 rounded-full bg-slate-100 overflow-hidden border border-slate-200">
-                  <div className="h-full bg-emerald-600 rounded-full transition-all duration-500" style={{ width: '6.6%' }} />
-                </div>
-              </div>
+              ))}
             </div>
           </div>
 
-          {/* Tacómetro de Salud y Desgaste del Creativo (Frecuencia) */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-indigo-600" />
+          {/* ─── Tacómetro de Fatiga del Creativo ─── */}
+          <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+              <div className="flex items-center gap-2.5">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-sm shadow-indigo-500/20">
+                  <Activity className="w-4 h-4" />
+                </div>
                 <h3 className="text-sm sm:text-base font-black text-slate-900">
-                  Tacómetro de Fatiga y Salud del Creativo
+                  Fatiga del Creativo
                 </h3>
               </div>
-              <span className="px-2.5 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black">
-                Frecuencia: {adFrequency.toFixed(2)} (Óptimo)
+              <span className="px-3 py-1 rounded-xl bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20 text-xs font-black">
+                {adFrequency.toFixed(2)}x — Óptimo ✓
               </span>
             </div>
 
-            <div className="space-y-2">
-              <div className="w-full h-3 rounded-full bg-slate-100 flex overflow-hidden border border-slate-200">
-                <div className="bg-emerald-500 h-full" style={{ width: '50%' }} title="Zona Óptima (1.0 - 1.5)" />
-                <div className="bg-amber-400 h-full" style={{ width: '30%' }} title="Zona Atención (1.5 - 2.2)" />
-                <div className="bg-rose-500 h-full" style={{ width: '20%' }} title="Zona Fatiga (>2.2)" />
+            <div className="space-y-3">
+              {/* Barra tricolor con indicador posicional */}
+              <div className="relative">
+                <div className="w-full h-3 rounded-full flex overflow-hidden ring-1 ring-slate-200/60">
+                  <div className="bg-gradient-to-r from-emerald-400 to-emerald-500 h-full" style={{ width: '50%' }} title="Zona Óptima (1.0 - 1.5)" />
+                  <div className="bg-gradient-to-r from-amber-300 to-amber-400 h-full" style={{ width: '30%' }} title="Zona Atención (1.5 - 2.2)" />
+                  <div className="bg-gradient-to-r from-rose-400 to-rose-500 h-full" style={{ width: '20%' }} title="Zona Fatiga (>2.2)" />
+                </div>
+                {/* Aguja indicadora */}
+                <div 
+                  className="absolute top-[-3px] w-0.5 h-[18px] bg-slate-900 rounded-full shadow-sm transition-all duration-700"
+                  style={{ left: `${tachometerPosition}%` }}
+                />
+                <div 
+                  className="absolute top-[17px] transition-all duration-700"
+                  style={{ left: `${tachometerPosition}%`, transform: 'translateX(-50%)' }}
+                >
+                  <span className="text-[9px] font-mono font-black text-slate-900 bg-white px-1.5 py-0.5 rounded-md ring-1 ring-slate-200 shadow-sm">
+                    {adFrequency.toFixed(2)}x
+                  </span>
+                </div>
               </div>
-              <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
-                <span>1.0x (Fresco)</span>
-                <span className="font-bold text-emerald-700">▲ Tu anuncio aquí ({adFrequency.toFixed(2)}x)</span>
-                <span>1.8x (Atención)</span>
-                <span>2.5x (Saturado)</span>
+              
+              <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono pt-2">
+                <span>1.0x <span className="text-slate-400">(Fresco)</span></span>
+                <span>1.5x <span className="text-slate-400">(Vigilar)</span></span>
+                <span>2.2x <span className="text-slate-400">(Saturado)</span></span>
               </div>
             </div>
 
-            <p className="text-xs text-slate-600 leading-relaxed">
-              <strong>Diagnóstico:</strong> Tu creativo tiene un índice de repetición de <strong>{adFrequency}x</strong>. El público de Quito y Guayaquil sigue siendo fresco y no hay saturación publicitaria.
+            <p className="text-xs text-slate-600 leading-relaxed bg-slate-50/50 p-3 rounded-xl border border-slate-100">
+              <Zap className="w-3.5 h-3.5 text-amber-500 inline mr-1.5" />
+              <strong>Diagnóstico:</strong> Frecuencia de <strong>{adFrequency}x</strong> — tu público en Quito y Guayaquil sigue siendo fresco. Sin saturación publicitaria.
             </p>
           </div>
 
-          {/* Matriz de Plataformas */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {/* ─── Matriz de Plataformas ─── */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
             {telemetry.platforms.map((plat) => {
               const isInstagram = plat.platform === 'instagram';
               const isFacebook = plat.platform === 'facebook';
+              const gradientBg = isInstagram 
+                ? 'from-fuchsia-500/5 via-purple-500/5 to-pink-500/5' 
+                : isFacebook 
+                ? 'from-blue-500/5 to-sky-500/5' 
+                : 'from-emerald-500/5 to-teal-500/5';
+              const ringColor = isInstagram 
+                ? 'ring-purple-200/60' 
+                : isFacebook 
+                ? 'ring-blue-200/60' 
+                : 'ring-emerald-200/60';
 
               return (
                 <div 
                   key={plat.platform}
-                  className={`p-4 sm:p-5 rounded-2xl border transition-all space-y-3 ${
-                    isInstagram 
-                      ? 'bg-gradient-to-b from-purple-50/40 to-pink-50/20 border-purple-200/90 shadow-2xs' 
-                      : isFacebook 
-                      ? 'bg-blue-50/30 border-blue-200/80' 
-                      : 'bg-emerald-50/30 border-emerald-200/80'
-                  }`}
+                  className={`group p-4 sm:p-5 rounded-2xl bg-gradient-to-b ${gradientBg} ring-1 ${ringColor} hover:shadow-md transition-all duration-300 space-y-3 animate-slide-up`}
                 >
                   <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      {isInstagram ? (
-                        <InstagramIcon className="w-5 h-5 text-pink-600" />
-                      ) : isFacebook ? (
-                        <FacebookIcon className="w-5 h-5 text-blue-600" />
-                      ) : (
-                        <MessageSquare className="w-5 h-5 text-emerald-600" />
-                      )}
+                    <div className="flex items-center gap-2.5">
+                      <div className={`p-1.5 rounded-lg ${isInstagram ? 'bg-gradient-to-br from-fuchsia-500 to-pink-500' : isFacebook ? 'bg-blue-600' : 'bg-emerald-600'} text-white shadow-sm`}>
+                        {isInstagram ? (
+                          <InstagramIcon className="w-4 h-4" />
+                        ) : isFacebook ? (
+                          <FacebookIcon className="w-4 h-4" />
+                        ) : (
+                          <MessageSquare className="w-4 h-4" />
+                        )}
+                      </div>
                       <span className="text-xs font-black text-slate-900 capitalize">
                         {plat.platform}
                       </span>
                     </div>
 
                     {isInstagram && (
-                      <span className="px-2 py-0.5 rounded-full bg-pink-100 text-pink-800 text-[10px] font-black">
-                        🏆 50% MÁS EFICIENTE
+                      <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-fuchsia-500/10 to-pink-500/10 text-fuchsia-700 ring-1 ring-fuchsia-500/20 text-[10px] font-black">
+                        🏆 +50% eficiente
                       </span>
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-2 bg-white p-2.5 rounded-xl border border-slate-200/70 text-xs">
+                  {/* Métricas en grid limpio — sin box-in-box redundante */}
+                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs pt-2 border-t border-slate-200/40">
                     <div>
-                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Gasto Real</span>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Gasto</span>
                       <span className="font-mono font-bold text-slate-800">${plat.spend.toFixed(2)}</span>
                     </div>
                     <div>
@@ -601,8 +585,8 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
                       <span className="font-mono font-bold text-slate-900">{plat.messages} chats</span>
                     </div>
                     <div>
-                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Coste/Mensaje</span>
-                      <span className={`font-mono font-black ${isInstagram ? 'text-emerald-700' : 'text-slate-800'}`}>
+                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Coste/Msg</span>
+                      <span className={`font-mono font-black ${isInstagram ? 'text-emerald-600' : 'text-slate-800'}`}>
                         ${plat.costPerMessage.toFixed(2)}
                       </span>
                     </div>
@@ -612,11 +596,11 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
                     </div>
                   </div>
 
-                  <p className="text-[11px] text-slate-600 leading-snug">
+                  <p className="text-[11px] text-slate-500 leading-snug">
                     {isInstagram 
-                      ? 'Instagram convierte mejor con mucho menos gasto. Entrega leads de mejor calidad por cada 100 impresiones.' 
+                      ? 'Mejor calidad de leads con menor inversión. Canal más eficiente.' 
                       : isFacebook 
-                      ? 'Facebook concentra volumen pero tiene mayor deserción de mensajes.' 
+                      ? 'Alto volumen pero mayor deserción en mensajes.' 
                       : 'Tráfico directo a número de WhatsApp.'}
                   </p>
                 </div>
@@ -627,63 +611,66 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* VISTA 2: MAPA HORARIO & COMPARATIVA CIUDADES                              */}
-      {/* ========================================================================= */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* VISTA 2: MAPA HORARIO & COMPARATIVA CIUDADES                      */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeSubTab === 'mapa_ciudades' && (
-        <div className="space-y-5 sm:space-y-6 animate-fade-in">
+        <div className="space-y-4 sm:space-y-5 stagger-children">
           
-          {/* Mapa de Calor Horario (Heatmap) */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-100 pb-4">
-              <div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-5 h-5 text-amber-600" />
-                  <h3 className="text-base font-black text-slate-900 tracking-tight">
-                    Mapa de Calor Horario (Horas Doradas de WhatsApp)
-                  </h3>
+          {/* ─── Heatmap Horario ─── */}
+          <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100/80 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-sm shadow-amber-500/20">
+                  <Clock className="w-4 h-4" />
                 </div>
-                <p className="text-xs text-slate-500 mt-1">
-                  Distribución de intensidad de clics y mensajes para saber cuándo estar disponible para responder al instante.
-                </p>
+                <div>
+                  <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                    Horas Doradas de WhatsApp
+                  </h3>
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Intensidad de clics y mensajes por franja horaria
+                  </p>
+                </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-800 bg-amber-50 px-3 py-1.5 rounded-xl border border-amber-200 self-start sm:self-auto">
-                <Flame className="w-4 h-4 text-amber-600" />
-                <span>Picos: 10:00 - 12:00 y 18:00 - 20:00</span>
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-700 bg-amber-500/10 px-3 py-1.5 rounded-xl ring-1 ring-amber-500/20 self-start sm:self-auto">
+                <Flame className="w-3.5 h-3.5" />
+                <span>Picos: 10-12h y 18-20h</span>
               </div>
             </div>
 
             <div className="overflow-x-auto">
               <table className="w-full text-xs text-center border-collapse">
                 <thead>
-                  <tr className="text-slate-400 font-bold text-[11px] uppercase border-b border-slate-200">
-                    <th className="py-2.5 text-left font-mono">Franja Horaria</th>
-                    <th className="py-2.5 px-2">Lun</th>
-                    <th className="py-2.5 px-2">Mar</th>
-                    <th className="py-2.5 px-2">Mié</th>
-                    <th className="py-2.5 px-2">Jue</th>
-                    <th className="py-2.5 px-2">Vie</th>
-                    <th className="py-2.5 px-2">Sáb</th>
-                    <th className="py-2.5 px-2">Dom</th>
+                  <tr className="text-slate-400 font-bold text-[10px] uppercase tracking-wider">
+                    <th className="py-2.5 text-left font-mono pl-1">Franja</th>
+                    <th className="py-2.5 px-1.5">Lun</th>
+                    <th className="py-2.5 px-1.5">Mar</th>
+                    <th className="py-2.5 px-1.5">Mié</th>
+                    <th className="py-2.5 px-1.5">Jue</th>
+                    <th className="py-2.5 px-1.5">Vie</th>
+                    <th className="py-2.5 px-1.5">Sáb</th>
+                    <th className="py-2.5 px-1.5">Dom</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
+                <tbody className="divide-y divide-slate-50 font-mono text-[11px]">
                   {heatMapSlots.map((slot) => (
-                    <tr key={slot.hour} className={slot.peak ? 'bg-amber-50/50 font-bold' : ''}>
-                      <td className="py-3 text-left font-semibold text-slate-700 font-sans">
+                    <tr key={slot.hour} className={`${slot.peak ? 'bg-amber-50/30' : ''} transition-colors`}>
+                      <td className="py-2.5 text-left font-semibold text-slate-600 font-sans text-[11px] pl-1 whitespace-nowrap">
+                        {slot.peak && <Flame className="w-3 h-3 text-amber-500 inline mr-1" />}
                         {slot.hour}
                       </td>
                       {[slot.lun, slot.mar, slot.mie, slot.jue, slot.vie, slot.sab, slot.dom].map((val, idx) => {
                         const intensityClass = 
-                          val >= 4 ? 'bg-emerald-600 text-white font-bold' :
-                          val >= 3 ? 'bg-emerald-400 text-white font-bold' :
-                          val >= 2 ? 'bg-emerald-100 text-emerald-900' :
-                          val === 1 ? 'bg-slate-100 text-slate-700' : 'text-slate-300';
+                          val >= 4 ? 'bg-emerald-600 text-white font-bold shadow-sm shadow-emerald-500/30' :
+                          val >= 3 ? 'bg-emerald-500/80 text-white font-bold' :
+                          val >= 2 ? 'bg-emerald-100 text-emerald-800 font-semibold' :
+                          val === 1 ? 'bg-slate-100 text-slate-600' : 'text-slate-300';
 
                         return (
-                          <td key={idx} className="py-3 px-2">
-                            <span className={`inline-block w-7 h-7 leading-7 rounded-lg transition-transform hover:scale-110 ${intensityClass}`}>
+                          <td key={idx} className="py-2.5 px-1.5">
+                            <span className={`heat-cell inline-block w-7 h-7 leading-7 rounded-lg transition-all duration-200 cursor-default ${intensityClass}`}>
                               {val}
                             </span>
                           </td>
@@ -695,50 +682,53 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
               </table>
             </div>
 
-            <div className="flex items-center gap-3 text-xs text-slate-500 pt-2 border-t border-slate-100">
-              <span className="font-semibold text-slate-700">Intensidad:</span>
-              <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-slate-100 border" /> 1 mensaje</span>
-              <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-100 border" /> 2 mensajes</span>
-              <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-400" /> 3 mensajes</span>
-              <span className="inline-flex items-center gap-1.5"><span className="w-3 h-3 rounded bg-emerald-600" /> 4+ mensajes (Pico)</span>
+            <div className="flex items-center gap-3 text-[10px] text-slate-500 pt-2 border-t border-slate-100/60 flex-wrap">
+              <span className="font-semibold text-slate-600">Intensidad:</span>
+              <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-100 ring-1 ring-slate-200" /> 1</span>
+              <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-100" /> 2</span>
+              <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-500/80" /> 3</span>
+              <span className="inline-flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-600 shadow-sm shadow-emerald-500/30" /> 4+</span>
             </div>
           </div>
 
-          {/* Comparativa Geográfica: Quito vs Guayaquil */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-4">
-            <div className="flex items-center gap-2 border-b border-slate-100 pb-3">
-              <MapPin className="w-5 h-5 text-indigo-600" />
-              <h3 className="text-base font-black text-slate-900">
-                Rendimiento Geográfico: Quito vs Guayaquil
+          {/* ─── Geo: Quito vs Guayaquil ─── */}
+          <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
+            <div className="flex items-center gap-3 border-b border-slate-100/80 pb-3">
+              <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-sm shadow-indigo-500/20">
+                <MapPin className="w-4 h-4" />
+              </div>
+              <h3 className="text-sm sm:text-base font-black text-slate-900">
+                Rendimiento Geográfico
               </h3>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Tarjeta Quito */}
-              <div className="p-4 rounded-2xl border border-indigo-200/80 bg-indigo-50/30 space-y-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Quito */}
+              <div className="group p-4 rounded-2xl ring-1 ring-indigo-200/60 bg-gradient-to-b from-indigo-500/5 to-transparent hover:shadow-md transition-all duration-300 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-600" />
-                    <span className="text-sm font-black text-slate-900">Quito (Pichincha)</span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 ring-2 ring-indigo-600/20" />
+                    <span className="text-sm font-black text-slate-900">Quito</span>
+                    <span className="text-[10px] text-slate-400 font-medium">(Pichincha)</span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-800 text-[10px] font-bold">
-                    Radio 24 km
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-700 text-[10px] font-bold ring-1 ring-indigo-500/20">
+                    R: 24 km
                   </span>
                 </div>
 
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs font-bold text-slate-700">
-                    <span>Volumen de Mensajes</span>
+                    <span>Mensajes</span>
                     <span className="font-mono text-indigo-700">9 chats (58%)</span>
                   </div>
-                  <div className="w-full h-2.5 rounded-full bg-slate-200 overflow-hidden">
-                    <div className="h-full bg-indigo-600 rounded-full" style={{ width: '58%' }} />
+                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full animate-bar-fill" style={{ '--bar-width': '58%', width: '58%' } as React.CSSProperties} />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 bg-white p-2 rounded-xl border border-slate-200/70 text-xs">
+                <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-slate-100/50">
                   <div>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Coste Promedio</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Coste Prom.</span>
                     <span className="font-mono font-bold text-slate-800">$1.35 USD</span>
                   </div>
                   <div>
@@ -748,31 +738,32 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
                 </div>
               </div>
 
-              {/* Tarjeta Guayaquil */}
-              <div className="p-4 rounded-2xl border border-sky-200/80 bg-sky-50/30 space-y-3">
+              {/* Guayaquil */}
+              <div className="group p-4 rounded-2xl ring-1 ring-sky-200/60 bg-gradient-to-b from-sky-500/5 to-transparent hover:shadow-md transition-all duration-300 space-y-3">
                 <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-sky-600" />
-                    <span className="text-sm font-black text-slate-900">Guayaquil (Guayas)</span>
+                  <div className="flex items-center gap-2.5">
+                    <span className="w-2.5 h-2.5 rounded-full bg-sky-600 ring-2 ring-sky-600/20" />
+                    <span className="text-sm font-black text-slate-900">Guayaquil</span>
+                    <span className="text-[10px] text-slate-400 font-medium">(Guayas)</span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md bg-sky-100 text-sky-800 text-[10px] font-bold">
-                    Radio 19 km
+                  <span className="px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-700 text-[10px] font-bold ring-1 ring-sky-500/20">
+                    R: 19 km
                   </span>
                 </div>
 
                 <div className="space-y-1.5">
                   <div className="flex justify-between text-xs font-bold text-slate-700">
-                    <span>Volumen de Mensajes</span>
+                    <span>Mensajes</span>
                     <span className="font-mono text-sky-700">6 chats (42%)</span>
                   </div>
-                  <div className="w-full h-2.5 rounded-full bg-slate-200 overflow-hidden">
-                    <div className="h-full bg-sky-600 rounded-full" style={{ width: '42%' }} />
+                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-sky-500 to-sky-600 rounded-full animate-bar-fill" style={{ '--bar-width': '42%', width: '42%' } as React.CSSProperties} />
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-2 bg-white p-2 rounded-xl border border-slate-200/70 text-xs">
+                <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-slate-100/50">
                   <div>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Coste Promedio</span>
+                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Coste Prom.</span>
                     <span className="font-mono font-bold text-slate-800">$1.48 USD</span>
                   </div>
                   <div>
@@ -787,25 +778,25 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* VISTA 3: GUIONES DE CIERRE & NOTA DE VOZ                                  */}
-      {/* ========================================================================= */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* VISTA 3: GUIONES DE CIERRE & NOTA DE VOZ                          */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeSubTab === 'scripts_cierre' && (
-        <div className="space-y-5 sm:space-y-6 animate-fade-in">
+        <div className="space-y-4 sm:space-y-5 stagger-children">
           
-          {/* Tarjeta de la Nota de Voz de 20 Segundos */}
-          <div className="bg-gradient-to-br from-rose-50/80 via-pink-50/40 to-white rounded-2xl sm:rounded-3xl border border-rose-200/90 shadow-2xs p-5 sm:p-6 space-y-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-100 pb-4">
+          {/* ─── Nota de Voz 20s ─── */}
+          <div className="bg-gradient-to-br from-rose-50/60 via-pink-50/30 to-white glass-card rounded-2xl sm:rounded-3xl ring-1 ring-rose-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-100/60 pb-4">
               <div className="flex items-center gap-3">
-                <div className="p-2 rounded-2xl bg-rose-600 text-white shadow-xs">
+                <div className="p-2.5 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-md shadow-rose-500/20">
                   <Mic className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-900">
-                    Técnica de la Nota de Voz de 20 Segundos
+                  <h3 className="text-sm sm:text-base font-black text-slate-900">
+                    Nota de Voz de 20 Segundos
                   </h3>
-                  <p className="text-xs text-slate-600 mt-0.5">
-                    Multiplica en un 300% las respuestas al generar confianza humana inmediata.
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    +300% respuestas con confianza humana inmediata
                   </p>
                 </div>
               </div>
@@ -813,81 +804,86 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
               <button
                 type="button"
                 onClick={() => copyToClipboard(audioVoiceScript, 'voice')}
-                className={`px-3.5 py-1.5 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 shadow-xs active:scale-95 ${
+                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 shrink-0 active:scale-95 ${
                   copiedId === 'voice'
-                    ? 'bg-emerald-600 text-white'
-                    : 'bg-rose-600 hover:bg-rose-700 text-white'
+                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
+                    : 'bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white shadow-md shadow-rose-500/20'
                 }`}
               >
                 {copiedId === 'voice' ? (
                   <>
                     <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>¡Guión Copiado!</span>
+                    <span>¡Copiado!</span>
                   </>
                 ) : (
                   <>
                     <Copy className="w-3.5 h-3.5" />
-                    <span>Copiar Guión para Grabar</span>
+                    <span>Copiar Guión</span>
                   </>
                 )}
               </button>
             </div>
 
-            <div className="bg-white p-4 rounded-2xl border border-rose-200/70 text-xs text-slate-800 leading-relaxed font-mono select-all shadow-2xs">
+            <div className="bg-white/80 p-4 rounded-xl ring-1 ring-rose-200/40 text-xs text-slate-700 leading-relaxed font-mono select-all">
               "{audioVoiceScript}"
             </div>
 
-            <div className="flex items-center gap-2 text-xs text-slate-500">
-              <Sparkles className="w-4 h-4 text-amber-500" />
-              <span><strong>Consejo:</strong> Grábalo caminando o de pie, con tono enérgico y seguro. No lo leas como un robot.</span>
+            <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-amber-500/5 p-2.5 rounded-xl ring-1 ring-amber-500/10">
+              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
+              <span><strong>Tip:</strong> Grábalo caminando o de pie, con tono enérgico y seguro. No lo leas como un robot.</span>
             </div>
           </div>
 
-          {/* Banco de 3 Respuestas Rápidas para Objeciones */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-4">
-            <div>
-              <h3 className="text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
-                <span>Cazador de Objeciones en WhatsApp</span>
-                <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
-                  3 Respuestas Clave
-                </span>
-              </h3>
-              <p className="text-xs text-slate-500 mt-1">
-                Copia y responde en 5 segundos cuando el cliente dude o pregunte por precio.
-              </p>
+          {/* ─── Banco de Objeciones ─── */}
+          <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
+                  <span>Cazador de Objeciones</span>
+                </h3>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Copia y responde en 5 segundos cuando el cliente dude
+                </p>
+              </div>
+              <span className="px-2.5 py-1 rounded-xl bg-slate-100/80 text-slate-600 text-[10px] font-bold ring-1 ring-slate-200/50">
+                3 Respuestas
+              </span>
             </div>
 
-            <div className="grid grid-cols-1 gap-4">
+            <div className="space-y-3">
               {objectionScripts.map((obj) => (
-                <div key={obj.id} className="p-4 rounded-2xl border border-slate-200/80 bg-slate-50/50 space-y-2.5">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-xs font-black text-slate-900">
-                      {obj.title}
-                    </span>
+                <div key={obj.id} className="group p-4 rounded-2xl ring-1 ring-slate-200/50 bg-slate-50/30 hover:bg-white hover:shadow-sm transition-all duration-200 space-y-3">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-start gap-2.5">
+                      <span className="text-lg leading-none mt-0.5">{obj.emoji}</span>
+                      <span className="text-xs font-black text-slate-900 leading-snug">
+                        {obj.title}
+                      </span>
+                    </div>
                     <button
                       type="button"
                       onClick={() => copyToClipboard(obj.text, obj.id)}
-                      className={`px-3 py-1 rounded-xl font-bold text-xs transition-all flex items-center gap-1.5 shrink-0 ${
+                      className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all flex items-center gap-1.5 shrink-0 active:scale-95 ${
                         copiedId === obj.id
-                          ? 'bg-emerald-600 text-white'
-                          : 'bg-white border border-slate-200 hover:bg-slate-100 text-slate-700'
+                          ? 'bg-emerald-600 text-white shadow-sm'
+                          : 'bg-white ring-1 ring-slate-200/60 hover:ring-slate-300 text-slate-600 hover:text-slate-900 shadow-sm'
                       }`}
                     >
                       {copiedId === obj.id ? (
                         <>
-                          <CheckCircle2 className="w-3.5 h-3.5" />
+                          <CheckCircle2 className="w-3 h-3" />
                           <span>Copiado</span>
                         </>
                       ) : (
                         <>
-                          <Copy className="w-3.5 h-3.5" />
+                          <Copy className="w-3 h-3" />
                           <span>Copiar</span>
                         </>
                       )}
                     </button>
                   </div>
 
-                  <div className="bg-white p-3 rounded-xl border border-slate-200/60 text-xs font-mono text-slate-700 whitespace-pre-line leading-relaxed">
+                  <div className="bg-white/80 p-3 rounded-xl ring-1 ring-slate-100 text-xs font-mono text-slate-600 whitespace-pre-line leading-relaxed">
                     {obj.text}
                   </div>
                 </div>
@@ -898,97 +894,118 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
         </div>
       )}
 
-      {/* ========================================================================= */}
-      {/* VISTA 4: REGLAS AUTOMATIZADAS & FEED EN VIVO                              */}
-      {/* ========================================================================= */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
+      {/* VISTA 4: REGLAS AUTOMATIZADAS & FEED EN VIVO                      */}
+      {/* ═══════════════════════════════════════════════════════════════════ */}
       {activeSubTab === 'reglas_live' && (
-        <div className="space-y-5 sm:space-y-6 animate-fade-in">
+        <div className="space-y-4 sm:space-y-5 stagger-children">
           
-          {/* Monitor de Reglas Creadas en Meta */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-              <div className="flex items-center gap-2">
-                <ShieldCheck className="w-5 h-5 text-emerald-600" />
+          {/* ─── Monitor de Reglas ─── */}
+          <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100/80 pb-4">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm shadow-emerald-500/20">
+                  <ShieldCheck className="w-4 h-4" />
+                </div>
                 <div>
-                  <h3 className="text-base font-black text-slate-900">
-                    Reglas Automatizadas Activas en Meta (Ad Rules Engine)
+                  <h3 className="text-sm sm:text-base font-black text-slate-900">
+                    Ad Rules Engine
                   </h3>
-                  <p className="text-xs text-slate-500">
-                    Instaladas en tu cuenta publicitaria <code>act_4362799907368161</code>.
+                  <p className="text-[11px] text-slate-500 mt-0.5">
+                    Reglas activas en <code className="text-[10px] font-mono">act_4362799907368161</code>
                   </p>
                 </div>
               </div>
 
-              <span className="px-3 py-1 rounded-full bg-emerald-100 text-emerald-800 text-xs font-black">
-                2 REGLAS EN SERVIDOR
+              <span className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20 text-xs font-black flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                2 Reglas Activas
               </span>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <div className="p-4 rounded-2xl border border-emerald-200 bg-emerald-50/40 space-y-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Kill Switch */}
+              <div className="group p-4 rounded-2xl ring-1 ring-emerald-200/60 bg-gradient-to-b from-emerald-500/5 to-transparent hover:shadow-md transition-all duration-300 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-emerald-950">Kill Switch de Emergencia</span>
-                  <span className="text-[10px] font-mono font-bold text-emerald-800">ID: 1395763285429559</span>
+                  <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                    <ShieldAlert className="w-3.5 h-3.5 text-emerald-600" />
+                    Kill Switch
+                  </span>
+                  <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-md">
+                    ID: 1395763...
+                  </span>
                 </div>
-                <p className="text-xs text-slate-700 leading-relaxed">
-                  <strong>Acción: PAUSE (Pausar Campaña).</strong><br />
-                  Se ejecuta si el costo por mensaje supera los <strong>$2.50 USD</strong> tras 3 resultados.
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <strong>PAUSE Campaña</strong> si costo/msg &gt; <strong>$2.50 USD</strong> tras 3 resultados
                 </p>
-                <div className="text-[10px] font-bold text-emerald-700 flex items-center gap-1 mt-1">
+                <div className="text-[10px] font-bold text-emerald-700 flex items-center gap-1.5 bg-emerald-500/5 p-2 rounded-lg ring-1 ring-emerald-500/10">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Estado en Meta: ENABLED (Activo)</span>
+                  <span>ENABLED — Evaluando continuamente</span>
                 </div>
               </div>
 
-              <div className="p-4 rounded-2xl border border-blue-200 bg-blue-50/40 space-y-2">
+              {/* Alerta */}
+              <div className="group p-4 rounded-2xl ring-1 ring-sky-200/60 bg-gradient-to-b from-sky-500/5 to-transparent hover:shadow-md transition-all duration-300 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-blue-950">Alerta Preventiva Temprana</span>
-                  <span className="text-[10px] font-mono font-bold text-blue-800">ID: 1480910183909016</span>
+                  <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
+                    <AlertTriangle className="w-3.5 h-3.5 text-sky-600" />
+                    Alerta Preventiva
+                  </span>
+                  <span className="text-[9px] font-mono font-bold text-sky-700 bg-sky-500/10 px-2 py-0.5 rounded-md">
+                    ID: 1480910...
+                  </span>
                 </div>
-                <p className="text-xs text-slate-700 leading-relaxed">
-                  <strong>Acción: NOTIFICATION (Aviso Instantáneo).</strong><br />
-                  Te alerta de inmediato si el costo por resultado supera los <strong>$2.20 USD</strong>.
+                <p className="text-xs text-slate-600 leading-relaxed">
+                  <strong>NOTIFICATION</strong> si costo/resultado &gt; <strong>$2.20 USD</strong> tras 2 resultados
                 </p>
-                <div className="text-[10px] font-bold text-blue-700 flex items-center gap-1 mt-1">
+                <div className="text-[10px] font-bold text-sky-700 flex items-center gap-1.5 bg-sky-500/5 p-2 rounded-lg ring-1 ring-sky-500/10">
                   <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>Estado en Meta: ENABLED (Activo)</span>
+                  <span>ENABLED — Evaluando continuamente</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Feed de Actividad en Vivo (Terminal Stream) */}
-          <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-5 sm:p-6 space-y-4">
-            <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <Radio className="w-5 h-5 text-indigo-600 animate-pulse" />
-                <h3 className="text-base font-black text-slate-900">
-                  Feed de Actividad y Telemetría en Tiempo Real
+          {/* ─── Feed de Actividad con Timeline ─── */}
+          <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
+            <div className="flex items-center justify-between border-b border-slate-100/80 pb-3">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm shadow-indigo-500/20">
+                  <Radio className="w-4 h-4" />
+                </div>
+                <h3 className="text-sm sm:text-base font-black text-slate-900">
+                  Feed en Tiempo Real
                 </h3>
               </div>
-              <span className="text-xs text-slate-500 font-mono">Últimas 24 horas</span>
+              <span className="text-[10px] text-slate-400 font-mono font-medium">Últimas 24h</span>
             </div>
 
-            <div className="space-y-2.5">
+            {/* Timeline con línea conectora */}
+            <div className="relative pl-8 timeline-line space-y-1">
               {liveEvents.map((ev) => (
-                <div key={ev.id} className="p-3 rounded-xl border border-slate-200/80 hover:bg-slate-50/80 transition-colors flex items-start justify-between gap-3 text-xs">
-                  <div className="space-y-0.5">
-                    <div className="flex items-center gap-2">
-                      <span className={`px-2 py-0.5 rounded-md border text-[10px] font-bold ${ev.badgeColor}`}>
-                        {ev.badge}
-                      </span>
-                      <span className="font-extrabold text-slate-900">
-                        {ev.title}
-                      </span>
+                <div key={ev.id} className="group relative p-3 rounded-xl hover:bg-slate-50/60 transition-all duration-200 animate-slide-up">
+                  {/* Dot en la timeline */}
+                  <div className={`absolute left-[-22px] top-4 w-3 h-3 rounded-full ${ev.dotColor} ring-4 ring-white z-10 group-hover:scale-125 transition-transform`} />
+                  
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${ev.badgeColor}`}>
+                          {ev.badge}
+                        </span>
+                        <span className="font-bold text-xs text-slate-900 truncate">
+                          {ev.title}
+                        </span>
+                      </div>
+                      <p className="text-[10px] text-slate-500 font-mono leading-relaxed truncate">
+                        {ev.detail}
+                      </p>
                     </div>
-                    <p className="text-[11px] text-slate-600 font-mono mt-0.5">
-                      {ev.detail}
-                    </p>
-                  </div>
 
-                  <span className="text-[10px] font-mono text-slate-400 shrink-0 font-medium">
-                    {ev.time}
-                  </span>
+                    <span className="text-[10px] font-mono text-slate-400 shrink-0 font-medium whitespace-nowrap mt-0.5">
+                      {ev.time}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
