@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
+import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
 import { db } from './lib/firebase';
 import { 
@@ -9,12 +9,15 @@ import {
   DashboardStats, 
   MetaEventRecord, 
   WhatsAppBotStatus,
-  TabView 
+  TabView,
+  ClientAccount,
+  UserRole
 } from './types';
 import { dispatchMetaCAPI } from './lib/meta-capi';
 import { SecurityGate } from './components/SecurityGate';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
+import { ClientManagerModal } from './components/ClientManagerModal';
 import { KanbanBoard } from './components/KanbanBoard';
 import { AnalyticsView } from './components/AnalyticsView';
 import { MetaAdsIntelligence } from './components/MetaAdsIntelligence';
@@ -80,13 +83,43 @@ const getTabFromHash = (hash: string): TabView => {
 };
 
 export const App: React.FC = () => {
-  // 1. Estado de Autenticación / Acceso
+  // 1. Estado de Autenticación / Acceso Multi-Cliente
   const [isUnlocked, setIsUnlocked] = useState<boolean>(() => {
     if (typeof window === 'undefined') return false;
     return sessionStorage.getItem('kindev_auth_session') === 'true';
   });
 
-  // 2. Estado de Configuración Meta
+  const [userRole, setUserRole] = useState<UserRole>(() => {
+    if (typeof window === 'undefined') return 'superadmin';
+    return (sessionStorage.getItem('kindev_auth_role') as UserRole) || 'superadmin';
+  });
+
+  const [activeTenantId, setActiveTenantIdState] = useState<string>(() => {
+    if (typeof window === 'undefined') return 'kindev';
+    return sessionStorage.getItem('kindev_auth_tenant') || 'kindev';
+  });
+
+  const setActiveTenantId = (tId: string) => {
+    setActiveTenantIdState(tId);
+    if (typeof window !== 'undefined') {
+      sessionStorage.setItem('kindev_auth_tenant', tId);
+    }
+  };
+
+  const CLIENTS_STORAGE_KEY = 'kindev_clients_registry';
+  const [clients, setClients] = useState<ClientAccount[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const cached = localStorage.getItem(CLIENTS_STORAGE_KEY);
+      return cached ? JSON.parse(cached) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  const [isClientManagerOpen, setIsClientManagerOpen] = useState<boolean>(false);
+
+  // 2. Estado de Configuración Meta (Kindev Default)
   const [config, setConfig] = useState<MetaConfig>(() => {
     if (typeof window === 'undefined') {
       return { testMode: true, testEventCode: 'TEST92244' };
@@ -101,6 +134,41 @@ export const App: React.FC = () => {
     }
     return { testMode: true, testEventCode: 'TEST92244' };
   });
+
+  // Cuenta Activa (Kindev o Cliente)
+  const activeTenant = useMemo(() => {
+    if (activeTenantId === 'kindev') {
+      return {
+        id: 'kindev',
+        name: 'Kindev S.A.S.',
+        isMaster: true,
+        clientPin: 'kindev2026',
+        metaConfig: {
+          datasetId: '1368429478371391',
+          accessToken: '',
+          testMode: config.testMode,
+          testEventCode: config.testEventCode
+        },
+        createdAt: '2026-01-01T00:00:00.000Z'
+      } as ClientAccount;
+    }
+    const found = clients.find((c) => c.id === activeTenantId);
+    return (
+      found ||
+      ({
+        id: activeTenantId,
+        name: activeTenantId,
+        clientPin: '',
+        metaConfig: {
+          datasetId: '',
+          accessToken: '',
+          testMode: true,
+          testEventCode: ''
+        },
+        createdAt: new Date().toISOString()
+      } as ClientAccount)
+    );
+  }, [activeTenantId, clients, config]);
 
   // 3. Estado de Leads & Sincronización
   const [leads, setLeads] = useState<Lead[]>(() => {
@@ -216,6 +284,7 @@ export const App: React.FC = () => {
               amount: Number(data.amount || 0),
               createdAt: data.createdAt || new Date().toISOString(),
               saleDate: data.saleDate,
+              tenantId: data.tenantId || 'kindev',
               metaEvents: Array.isArray(data.metaEvents) ? data.metaEvents : []
             });
           });
@@ -243,6 +312,30 @@ export const App: React.FC = () => {
       setFirestoreConnected(false);
     }
   }, [isUnlocked]);
+
+  // Sincronización en tiempo real de cuentas de clientes (tenants_registry)
+  useEffect(() => {
+    try {
+      const docRef = doc(db, 'settings', 'tenants_registry');
+      const unsubscribe = onSnapshot(docRef, (snapshot) => {
+        if (snapshot.exists()) {
+          const data = snapshot.data();
+          if (Array.isArray(data.clients)) {
+            setClients(data.clients);
+            try {
+              localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(data.clients));
+            } catch {
+              // ignore
+            }
+          }
+        }
+      });
+
+      return () => unsubscribe();
+    } catch (err) {
+      console.warn('Error sincronizando tenants_registry:', err);
+    }
+  }, []);
 
   // Escuchar estado del WhatsApp Bot (Firestore + Localhost)
   const refreshWhatsAppStatus = async () => {
@@ -311,13 +404,21 @@ export const App: React.FC = () => {
     };
   }, [isUnlocked]);
 
-  // Cálculo de KPIs / Estadísticas
+  // Leads pertenecientes exclusivamente al tenant activo
+  const tenantLeads = useMemo(() => {
+    if (activeTenantId === 'kindev') {
+      return leads.filter((l) => !l.tenantId || l.tenantId === 'kindev');
+    }
+    return leads.filter((l) => l.tenantId === activeTenantId);
+  }, [leads, activeTenantId]);
+
+  // Cálculo de KPIs / Estadísticas para el tenant activo
   const stats: DashboardStats = useMemo(() => {
-    const totalLeads = leads.length;
-    const closedList = leads.filter((l) => l.status === 'cerrado');
+    const totalLeads = tenantLeads.length;
+    const closedList = tenantLeads.filter((l) => l.status === 'cerrado');
     const closedLeads = closedList.length;
     const totalRevenue = closedList.reduce((acc, curr) => acc + (curr.amount || 0), 0);
-    const pendingLeads = leads.filter(
+    const pendingLeads = tenantLeads.filter(
       (l) => l.status === 'prospecto' || l.status === 'cotizado' || l.status === 'en_negociacion' || l.status === 'anticipo'
     ).length;
 
@@ -327,11 +428,11 @@ export const App: React.FC = () => {
       totalRevenue,
       pendingLeads
     };
-  }, [leads]);
+  }, [tenantLeads]);
 
-  // Filtro de leads
+  // Filtro de leads del tenant activo
   const filteredLeads = useMemo(() => {
-    return leads.filter((lead) => {
+    return tenantLeads.filter((lead) => {
       const matchesSearch =
         lead.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         lead.phone.includes(searchQuery) ||
@@ -348,7 +449,7 @@ export const App: React.FC = () => {
 
       return matchesSearch && matchesStatus;
     });
-  }, [leads, searchQuery, statusFilter]);
+  }, [tenantLeads, searchQuery, statusFilter]);
 
   // Reset de página al buscar o filtrar
   useEffect(() => {
@@ -377,16 +478,26 @@ export const App: React.FC = () => {
 
     try {
       if (isClosed && saleAmount > 0) {
-        // Enviar compra inmediatamente a Meta
-        const capiRes = await dispatchMetaCAPI({
-          eventName: 'Purchase',
-          phone: data.phone,
-          name: data.name,
-          value: saleAmount,
-          currency: 'USD',
-          testMode: config.testMode,
-          testEventCode: config.testEventCode
-        });
+        // Enviar compra inmediatamente a Meta con credenciales del tenant activo
+        const tenantMetaCreds = activeTenantId !== 'kindev' && activeTenant?.metaConfig?.datasetId
+          ? {
+              datasetId: activeTenant.metaConfig.datasetId,
+              accessToken: activeTenant.metaConfig.accessToken
+            }
+          : undefined;
+
+        const capiRes = await dispatchMetaCAPI(
+          {
+            eventName: 'Purchase',
+            phone: data.phone,
+            name: data.name,
+            value: saleAmount,
+            currency: 'USD',
+            testMode: activeTenant.metaConfig.testMode,
+            testEventCode: activeTenant.metaConfig.testEventCode
+          },
+          tenantMetaCreds
+        );
 
         initialEvents = [{
           eventName: 'Purchase',
@@ -394,7 +505,7 @@ export const App: React.FC = () => {
           currency: 'USD',
           date: new Date().toISOString(),
           fbtraceId: capiRes.fbtraceId,
-          testMode: config.testMode
+          testMode: activeTenant.metaConfig.testMode
         }];
       }
 
@@ -408,6 +519,7 @@ export const App: React.FC = () => {
         amount: saleAmount,
         createdAt: new Date().toISOString(),
         source: 'manual' as const,
+        tenantId: activeTenantId,
         metaEvents: initialEvents,
         ...(isClosed ? { saleDate: new Date().toISOString() } : {})
       };
@@ -466,16 +578,27 @@ export const App: React.FC = () => {
     if (!targetLead) return;
 
     try {
-      // 1. Despachar a Meta CAPI con SHA-256
-      const capiRes = await dispatchMetaCAPI({
-        eventName: 'Purchase',
-        phone: targetLead.phone,
-        name: targetLead.name,
-        value: amount,
-        currency: 'USD',
-        testMode: config.testMode,
-        testEventCode: config.testEventCode
-      });
+      // 1. Despachar a Meta CAPI con SHA-256 (usando credenciales del tenant si aplica)
+      const tenantMetaCreds = activeTenantId !== 'kindev' && activeTenant?.metaConfig?.datasetId
+        ? {
+            datasetId: activeTenant.metaConfig.datasetId,
+            accessToken: activeTenant.metaConfig.accessToken
+          }
+        : undefined;
+
+      const capiRes = await dispatchMetaCAPI(
+        {
+          eventName: 'Purchase',
+          phone: targetLead.phone,
+          name: targetLead.name,
+          value: amount,
+          currency: 'USD',
+          leadId: targetLead.id,
+          testMode: activeTenant.metaConfig.testMode,
+          testEventCode: activeTenant.metaConfig.testEventCode
+        },
+        tenantMetaCreds
+      );
 
       const newMetaEvent: MetaEventRecord = {
         eventName: 'Purchase',
@@ -483,7 +606,7 @@ export const App: React.FC = () => {
         currency: 'USD',
         date: new Date().toISOString(),
         fbtraceId: capiRes.fbtraceId,
-        testMode: config.testMode
+        testMode: activeTenant.metaConfig.testMode
       };
 
       const updatedEvents = [...(targetLead.metaEvents || []), newMetaEvent];
@@ -566,21 +689,95 @@ export const App: React.FC = () => {
   };
 
   const handleSaveConfig = async (newConfig: MetaConfig, newToken?: string) => {
-    setConfig(newConfig);
-    localStorage.setItem('kindev_meta_config', JSON.stringify(newConfig));
-    if (newToken) {
-      localStorage.setItem('kindev_meta_token', newToken);
+    if (activeTenantId === 'kindev') {
+      setConfig(newConfig);
+      localStorage.setItem('kindev_meta_config', JSON.stringify(newConfig));
+      if (newToken) {
+        localStorage.setItem('kindev_meta_token', newToken);
+      }
+    } else {
+      const updatedClient: ClientAccount = {
+        ...activeTenant,
+        metaConfig: {
+          ...activeTenant.metaConfig,
+          testMode: newConfig.testMode,
+          testEventCode: newConfig.testEventCode,
+          ...(newToken ? { accessToken: newToken } : {})
+        }
+      };
+      await handleSaveClient(updatedClient);
     }
     showToast('Configuración guardada exitosamente', 'success');
   };
 
+  const handleSaveClient = async (clientToSave: ClientAccount) => {
+    const updated = [...clients];
+    const idx = updated.findIndex((c) => c.id === clientToSave.id);
+    if (idx >= 0) {
+      updated[idx] = clientToSave;
+    } else {
+      updated.push(clientToSave);
+    }
+    setClients(updated);
+    try {
+      localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+
+    try {
+      if (firestoreConnected) {
+        await setDoc(doc(db, 'settings', 'tenants_registry'), {
+          clients: updated,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+    } catch (err) {
+      console.warn('Error guardando en Firestore tenants_registry:', err);
+    }
+  };
+
+  const handleDeleteClient = async (clientId: string) => {
+    const updated = clients.filter((c) => c.id !== clientId);
+    setClients(updated);
+    try {
+      localStorage.setItem(CLIENTS_STORAGE_KEY, JSON.stringify(updated));
+    } catch {
+      // ignore
+    }
+
+    if (activeTenantId === clientId) {
+      setActiveTenantId('kindev');
+    }
+
+    try {
+      if (firestoreConnected) {
+        await setDoc(doc(db, 'settings', 'tenants_registry'), {
+          clients: updated,
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      }
+      showToast('Cliente eliminado', 'info');
+    } catch (err) {
+      console.warn('Error eliminando en Firestore tenants_registry:', err);
+    }
+  };
+
+  const handleUnlock = (role: UserRole, tenantId: string) => {
+    setUserRole(role);
+    setActiveTenantId(tenantId);
+    setIsUnlocked(true);
+  };
+
   const handleLock = () => {
     sessionStorage.removeItem('kindev_auth_session');
+    sessionStorage.removeItem('kindev_auth_role');
+    sessionStorage.removeItem('kindev_auth_tenant');
     setIsUnlocked(false);
   };
 
   if (!isUnlocked) {
-    return <SecurityGate onUnlock={() => setIsUnlocked(true)} />;
+    return <SecurityGate onUnlock={handleUnlock} clients={clients} />;
   }
 
   return (
@@ -592,17 +789,20 @@ export const App: React.FC = () => {
         onClose={() => setIsSidebarOpen(false)}
         activeTab={activeTab}
         onSelectTab={(tab) => setActiveTab(tab)}
-        config={config}
+        config={activeTenant.metaConfig || config}
         wsStatus={wsStatus}
-        kanbanCount={leads.filter((l) => l.status !== 'descartado').length}
-        closedCount={leads.filter((l) => l.status === 'cerrado').length}
-        followUpCount={leads.filter((l) => ['prospecto', 'cotizado', 'en_negociacion'].includes(l.status)).length}
+        kanbanCount={tenantLeads.filter((l) => l.status !== 'descartado').length}
+        closedCount={tenantLeads.filter((l) => l.status === 'cerrado').length}
+        followUpCount={tenantLeads.filter((l) => ['prospecto', 'cotizado', 'en_negociacion'].includes(l.status)).length}
         firestoreConnected={firestoreConnected}
         onOpenConfig={() => setIsConfigOpen(true)}
         onOpenWsStatus={() => setIsWsModalOpen(true)}
         onLock={handleLock}
         isCollapsed={isSidebarCollapsed}
         onToggleCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+        onOpenClientManager={() => setIsClientManagerOpen(true)}
+        activeTenantName={activeTenant.name}
+        userRole={userRole}
       />
 
       {/* 2. Área de Contenido Principal */}
@@ -613,11 +813,17 @@ export const App: React.FC = () => {
           activeTab={activeTab}
           onOpenSidebar={() => setIsSidebarOpen(true)}
           onAddNewLead={() => setActiveTab('quick_list')}
-          config={config}
+          config={activeTenant.metaConfig || config}
           wsStatus={wsStatus}
           onOpenWsStatus={() => setIsWsModalOpen(true)}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebarCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
+          activeTenantId={activeTenantId}
+          activeTenantName={activeTenant.name}
+          userRole={userRole}
+          clients={clients}
+          onSelectTenant={(id) => setActiveTenantId(id)}
+          onOpenClientManager={() => setIsClientManagerOpen(true)}
         />
 
         {/* Contenedor Principal con Espacio Seguro para Barra Inferior en Celular */}
@@ -628,14 +834,14 @@ export const App: React.FC = () => {
         }`}>
           
           {/* Banner informativo de modo prueba si está activo */}
-          {config.testMode && (
+          {Boolean(activeTenant.metaConfig?.testMode ?? config.testMode) && (
             <div className="bg-amber-50 border border-amber-200/90 rounded-2xl p-4 flex items-center justify-between gap-4 text-amber-900 text-xs shadow-sm">
               <div className="flex items-center gap-2.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping shrink-0" />
                 <span>
-                  <strong>Modo Prueba Meta Activo:</strong> Los eventos se están despachando con el código{' '}
+                  <strong>Modo Prueba Meta Activo ({activeTenant.name}):</strong> Los eventos se están despachando con el código{' '}
                   <code className="font-mono bg-amber-100 px-1.5 py-0.5 rounded text-amber-800 font-bold">
-                    {config.testEventCode || 'TEST92244'}
+                    {activeTenant.metaConfig?.testEventCode || config.testEventCode || 'TEST92244'}
                   </code>
                   . Puedes visualizarlos en vivo en el Events Manager de Meta.
                 </span>
@@ -652,7 +858,7 @@ export const App: React.FC = () => {
         {/* 1. Módulo: Pipeline Kanban */}
         {activeTab === 'kanban' && (
           <KanbanBoard
-            leads={leads}
+            leads={tenantLeads}
             onUpdateStatus={handleUpdateStatus}
             onOpenSaleModal={(lead) => setSaleLead(lead)}
             onAddNewLead={() => setActiveTab('quick_list')}
@@ -663,22 +869,22 @@ export const App: React.FC = () => {
 
         {/* 2. Módulo: Métricas & Gráficos */}
         {activeTab === 'analytics' && (
-          <AnalyticsView leads={leads} />
+          <AnalyticsView leads={tenantLeads} />
         )}
 
         {/* 3. Módulo: Inteligencia Meta Ads */}
         {activeTab === 'ads_intelligence' && (
-          <MetaAdsIntelligence leads={leads} />
+          <MetaAdsIntelligence leads={tenantLeads} />
         )}
 
         {/* 4. Módulo: Clientes & LTV */}
         {activeTab === 'ltv_clients' && (
-          <LtvClientsView leads={leads} />
+          <LtvClientsView leads={tenantLeads} />
         )}
 
         {/* 5. Módulo: Centro de Seguimiento */}
         {activeTab === 'follow_up' && (
-          <FollowUpCenter leads={leads} onSaveNote={handleSaveLeadNote} />
+          <FollowUpCenter leads={tenantLeads} onSaveNote={handleSaveLeadNote} />
         )}
 
         {/* 6. Módulo: Lista & Registro Rápido */}
@@ -865,9 +1071,21 @@ export const App: React.FC = () => {
       <BottomNav
         activeTab={activeTab}
         onSelectTab={(tab) => setActiveTab(tab)}
-        kanbanCount={leads.filter((l) => l.status !== 'descartado' && l.status !== 'cerrado').length}
-        closedCount={leads.filter((l) => l.status === 'cerrado').length}
-        followUpCount={leads.filter((l) => ['prospecto', 'cotizado', 'en_negociacion'].includes(l.status)).length}
+        kanbanCount={tenantLeads.filter((l) => l.status !== 'descartado' && l.status !== 'cerrado').length}
+        closedCount={tenantLeads.filter((l) => l.status === 'cerrado').length}
+        followUpCount={tenantLeads.filter((l) => ['prospecto', 'cotizado', 'en_negociacion'].includes(l.status)).length}
+      />
+
+      {/* Modal de Gestión Multi-Cliente */}
+      <ClientManagerModal
+        isOpen={isClientManagerOpen}
+        onClose={() => setIsClientManagerOpen(false)}
+        clients={clients}
+        activeTenantId={activeTenantId}
+        onSelectTenant={(id) => setActiveTenantId(id)}
+        onSaveClient={handleSaveClient}
+        onDeleteClient={handleDeleteClient}
+        onShowToast={showToast}
       />
 
       {/* Modal de Cierre de Venta */}
@@ -880,7 +1098,7 @@ export const App: React.FC = () => {
       {/* Modal de Configuración y Seguridad */}
       <ConfigModal
         isOpen={isConfigOpen}
-        config={config}
+        config={activeTenant.metaConfig || config}
         onClose={() => setIsConfigOpen(false)}
         onSaveConfig={handleSaveConfig}
         onShowToast={showToast}

@@ -15,9 +15,10 @@ import {
   X, 
   ChevronRight,
   PanelLeftClose,
-  PanelLeftOpen
+  PanelLeftOpen,
+  Building2
 } from 'lucide-react';
-import { TabView, MetaConfig, WhatsAppBotStatus } from '../types';
+import { TabView, MetaConfig, WhatsAppBotStatus, UserRole } from '../types';
 import { META_DATASET_ID } from '../lib/meta-capi';
 
 interface SidebarProps {
@@ -36,6 +37,10 @@ interface SidebarProps {
   onLock: () => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
+  // Multi-cliente
+  onOpenClientManager?: () => void;
+  activeTenantName?: string;
+  userRole?: UserRole;
 }
 
 export const Sidebar: React.FC<SidebarProps> = ({
@@ -53,7 +58,10 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onOpenWsStatus,
   onLock,
   isCollapsed = false,
-  onToggleCollapse
+  onToggleCollapse,
+  onOpenClientManager,
+  activeTenantName = 'Kindev S.A.S.',
+  userRole = 'superadmin'
 }) => {
   const isWsConnected = wsStatus.isListening && wsStatus.status === 'connected';
 
@@ -144,8 +152,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
                 <div className="flex items-center gap-1.5">
                   <h1 className="font-black text-white text-base tracking-tight truncate">Kindev Meta Ads</h1>
                 </div>
-                <p className="text-[11px] text-slate-400 font-semibold tracking-wide truncate">
-                  CAPI Suite • SaaS 2026
+                <p className="text-[11px] text-violet-400 font-semibold tracking-wide truncate">
+                  {activeTenantName}
                 </p>
               </div>
             )}
@@ -309,6 +317,25 @@ export const Sidebar: React.FC<SidebarProps> = ({
             );
           })}
         </div>
+
+        {/* Acceso a Gestión de Clientes (Solo SuperAdmin) */}
+        {userRole === 'superadmin' && onOpenClientManager && !isCollapsed && (
+          <div className="px-3 mb-2">
+            <button
+              type="button"
+              onClick={onOpenClientManager}
+              className="w-full py-2 px-3 rounded-xl bg-violet-950/30 hover:bg-violet-900/40 border border-violet-500/30 text-violet-300 text-xs font-bold flex items-center justify-between transition-all"
+            >
+              <span className="flex items-center gap-2">
+                <Building2 className="w-3.5 h-3.5 text-violet-400" />
+                <span>Cuentas de Clientes</span>
+              </span>
+              <span className="text-[10px] bg-violet-600/50 text-white px-1.5 py-0.5 rounded font-mono">
+                SaaS
+              </span>
+            </button>
+          </div>
+        )}
 
         {/* Estado del Entorno e Infraestructura (Solo en vista expandida) */}
         {!isCollapsed ? (

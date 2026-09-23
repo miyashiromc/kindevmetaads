@@ -93,6 +93,18 @@ function sha256Pure(ascii: string): string {
   return result;
 }
 
+export function detectCountryCode(phone: string): string {
+  if (!phone) return 'ec';
+  const clean = phone.replace(/\D/g, '');
+  if (clean.startsWith('593')) return 'ec';
+  if (clean.startsWith('1') && clean.length === 11) return 'us';
+  if (clean.startsWith('57')) return 'co';
+  if (clean.startsWith('51')) return 'pe';
+  if (clean.startsWith('34')) return 'es';
+  if (clean.startsWith('52')) return 'mx';
+  return 'ec';
+}
+
 export interface DispatchParams {
   eventName: 'Purchase' | 'Lead' | 'Contact';
   phone: string;
@@ -100,8 +112,15 @@ export interface DispatchParams {
   email?: string;
   value?: number;
   currency?: string;
+  leadId?: string;
+  countryCode?: string;
   testMode?: boolean;
   testEventCode?: string;
+}
+
+export interface MetaCredentialsOverride {
+  datasetId?: string;
+  accessToken?: string;
 }
 
 export interface DispatchResult {
@@ -110,12 +129,20 @@ export interface DispatchResult {
   eventId: string;
 }
 
-export async function dispatchMetaCAPI(params: DispatchParams): Promise<DispatchResult> {
-  const token = getStoredMetaToken();
+export async function dispatchMetaCAPI(
+  params: DispatchParams,
+  credentials?: MetaCredentialsOverride
+): Promise<DispatchResult> {
+  const resolvedDatasetId = credentials?.datasetId?.trim() || META_DATASET_ID;
+  const token = credentials?.accessToken?.trim() || getStoredMetaToken();
   const cleanPhone = formatPhoneNumber(params.phone);
   const hashedPhone = cleanPhone ? await hashSha256(cleanPhone) : null;
   const hashedEmail = params.email ? await hashSha256(params.email) : null;
   const hashedName = params.name ? await hashSha256(params.name.split(' ')[0]) : null;
+
+  const country = params.countryCode?.toLowerCase().trim() || detectCountryCode(cleanPhone);
+  const hashedCountry = country ? await hashSha256(country) : null;
+  const hashedExternalId = params.leadId ? await hashSha256(params.leadId.trim()) : null;
 
   const resolvedEventId = `kd_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
 
@@ -128,6 +155,8 @@ export async function dispatchMetaCAPI(params: DispatchParams): Promise<Dispatch
       ph?: string[];
       em?: string[];
       fn?: string[];
+      country?: string[];
+      external_id?: string[];
       client_user_agent: string;
     };
     custom_data?: {
@@ -147,7 +176,9 @@ export async function dispatchMetaCAPI(params: DispatchParams): Promise<Dispatch
       ...(hashedPhone ? { ph: [hashedPhone] } : {}),
       ...(hashedEmail ? { em: [hashedEmail] } : {}),
       ...(hashedName ? { fn: [hashedName] } : {}),
-      client_user_agent: 'Kindev-React19-Dashboard/2.0'
+      ...(hashedCountry ? { country: [hashedCountry] } : {}),
+      ...(hashedExternalId ? { external_id: [hashedExternalId] } : {}),
+      client_user_agent: typeof navigator !== 'undefined' && navigator.userAgent ? navigator.userAgent : 'Kindev-React19-Dashboard/2026'
     }
   };
 
@@ -163,7 +194,7 @@ export async function dispatchMetaCAPI(params: DispatchParams): Promise<Dispatch
     eventData.test_event_code = params.testEventCode.trim();
   }
 
-  const url = `https://graph.facebook.com/v19.0/${META_DATASET_ID}/events?access_token=${token}`;
+  const url = `https://graph.facebook.com/v19.0/${resolvedDatasetId}/events?access_token=${token}`;
 
   const res = await fetch(url, {
     method: 'POST',

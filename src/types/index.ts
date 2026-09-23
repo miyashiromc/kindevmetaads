@@ -27,12 +27,37 @@ export interface Lead {
   domainExpiryDate?: string;
   lastContactDate?: string;
   followUpNote?: string;
+  tenantId?: string; // ID del cliente o 'kindev'
   metaEvents: MetaEventRecord[];
 }
+
+export interface ClientAccount {
+  id: string; // Slug único ej: 'kindev', 'cliente-mendez'
+  name: string;
+  isMaster?: boolean;
+  clientPin: string; // PIN para que el cliente ingrese directo
+  phone?: string;
+  metaConfig: {
+    datasetId: string;
+    accessToken: string;
+    testMode: boolean;
+    testEventCode: string;
+  };
+  whatsappConfig?: {
+    status?: 'connected' | 'qr_ready' | 'disconnected';
+    connectedUser?: string;
+  };
+  notes?: string;
+  createdAt: string;
+}
+
+export type UserRole = 'superadmin' | 'client';
 
 export interface MetaConfig {
   testMode: boolean;
   testEventCode: string;
+  datasetId?: string;
+  accessToken?: string;
 }
 
 export interface PricingPreset {
@@ -86,5 +111,55 @@ export interface ClientLTVRecord {
   daysUntilHostingExpiry: number;
   upsellOpportunity: string;
   upsellPotentialUsd: number;
+}
+
+export interface MetaLiveCampaignInsights {
+  id: string;
+  name: string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  cpc: number;
+  cpm: number;
+  messagingConnections: number;
+  firstReplies: number;
+  depth2Replies: number;
+  depth5Replies: number;
+  linkClicks: number;
+  costPerMessage: number;
+  dropRatePercent: number;
+}
+
+export interface MetaPlatformBreakdown {
+  platform: 'facebook' | 'instagram' | 'whatsapp' | 'audience_network' | string;
+  spend: number;
+  impressions: number;
+  clicks: number;
+  messages: number;
+  costPerMessage: number;
+  conversionRatePercent: number;
+}
+
+export interface MetaLiveTelemetry {
+  isLive: boolean;
+  lastSync: string;
+  adAccountId: string;
+  campaign: MetaLiveCampaignInsights;
+  platforms: MetaPlatformBreakdown[];
+  activeAd: {
+    id: string;
+    name: string;
+    status: string;
+    priceAnchor: string;
+    title: string;
+    bodySnippet: string;
+  };
+  killSwitch: {
+    enabled: boolean;
+    maxCostPerMessage: number;
+    maxSpendWithoutLead: number;
+    currentCost: number;
+    statusText: string;
+  };
 }
 

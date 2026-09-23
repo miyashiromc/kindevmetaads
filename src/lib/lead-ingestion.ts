@@ -1,4 +1,4 @@
-﻿import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
+import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { formatPhoneNumber, dispatchMetaCAPI } from './meta-capi';
 import { LeadStatus } from '../types';
@@ -9,6 +9,7 @@ export interface IngestLeadPayload {
   message?: string;
   service?: string;
   source?: 'whatsapp_auto' | 'manual';
+  tenantId?: string;
 }
 
 export interface IngestResult {
@@ -20,7 +21,7 @@ export interface IngestResult {
 
 export async function ingestIncomingLead(
   payload: IngestLeadPayload,
-  config?: { testMode: boolean; testEventCode: string }
+  config?: { testMode: boolean; testEventCode: string; datasetId?: string; accessToken?: string }
 ): Promise<IngestResult> {
   const cleanPhone = formatPhoneNumber(payload.phone);
   if (!cleanPhone) {
@@ -50,19 +51,25 @@ export async function ingestIncomingLead(
       amount: 0,
       createdAt: new Date().toISOString(),
       source: payload.source || 'whatsapp_auto',
+      tenantId: payload.tenantId || 'kindev',
       metaEvents: []
     };
 
     const docRef = await addDoc(leadsRef, newLead);
 
-    // Disparar evento Lead a Meta Conversions API en segundo plano
-    dispatchMetaCAPI({
-      eventName: 'Lead',
-      phone: cleanPhone,
-      name: newLead.name,
-      testMode: config?.testMode,
-      testEventCode: config?.testEventCode
-    }).catch((err) => console.warn('CAPI Lead warning:', err));
+    // Disparar evento Lead a Meta Conversions API en segundo plano con credenciales si existen
+    dispatchMetaCAPI(
+      {
+        eventName: 'Lead',
+        phone: cleanPhone,
+        name: newLead.name,
+        testMode: config?.testMode,
+        testEventCode: config?.testEventCode
+      },
+      config?.datasetId
+        ? { datasetId: config.datasetId, accessToken: config.accessToken }
+        : undefined
+    ).catch((err) => console.warn('CAPI Lead warning:', err));
 
     return {
       success: true,
