@@ -333,14 +333,80 @@ const OUTBOUND_INTEREST_KEYWORDS = [
 // Lista de teléfonos propios o internos a excluir de auto-captura
 const EXCLUDED_PHONES = ['593991952889', '593991952888'];
 
-// Helper unificado para guardar leads en Cloud Firestore
+// Mapeo en memoria de clientes existentes en Firestore para PREVENIR DUPLICADOS
+const existingFirestoreLeadsByPhone = new Map(); // phone -> { id, name, status, amount, notes }
+
+async function syncFirestoreExistingLeadsCache() {
+  try {
+    const res = await fetch(`${FIRESTORE_REST_URL}?pageSize=300`);
+    if (!res.ok) return;
+    const data = await res.json();
+    const docs = data.documents || [];
+    existingFirestoreLeadsByPhone.clear();
+    for (const d of docs) {
+      const id = d.name.split('/').pop();
+      const f = d.fields || {};
+      const ph = cleanPhone(f.phone?.stringValue || '');
+      if (ph) {
+        existingFirestoreLeadsByPhone.set(ph, {
+          id,
+          name: f.name?.stringValue || '',
+          status: f.status?.stringValue || 'prospecto',
+          amount: f.amount?.doubleValue || f.amount?.integerValue || 0,
+          notes: f.notes?.stringValue || ''
+        });
+      }
+    }
+    console.log(`🛡️ [Anti-Duplicados] Sincronizados ${existingFirestoreLeadsByPhone.size} clientes existentes de Firestore.`);
+  } catch (err) {
+    console.warn('⚠️ Error sincronizando caché de Firestore:', err.message);
+  }
+}
+
+// Sincronizar al arrancar y cada 10 minutos
+syncFirestoreExistingLeadsCache();
+setInterval(syncFirestoreExistingLeadsCache, 10 * 60 * 1000);
+
+// Helper unificado para guardar leads en Cloud Firestore con PROTECCIÓN TOTAL DE DUPLICADOS
 async function saveLeadToFirestore({ name, phone, displayPhone, service, notes, source, tenantId = 'kindev', eventId }) {
+  const cleanPh = cleanPhone(phone);
+  if (!cleanPh) return false;
+
+  // 1. VERIFICACIÓN ANTI-DUPLICADOS ESTRICTA (Protege clientes cerrados y avanzados)
+  const existingLead = existingFirestoreLeadsByPhone.get(cleanPh);
+  if (existingLead) {
+    console.log(`🛡️ [Anti-Duplicados] Cliente existente detectado: "${existingLead.name}" (+${cleanPh}) [Estado: ${existingLead.status}]. Actualizando notas sin duplicar documento.`);
+    try {
+      const updatedNotes = existingLead.notes 
+        ? `${existingLead.notes}\n[Nuevo mensaje WhatsApp ${new Date().toLocaleTimeString()}]: "${notes || ''}"`
+        : notes || '';
+      
+      const patchUrl = `${FIRESTORE_REST_URL}/${existingLead.id}?updateMask.fieldPaths=notes&updateMask.fieldPaths=lastContactDate`;
+      await fetch(patchUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          fields: {
+            notes: { stringValue: updatedNotes.slice(0, 1500) },
+            lastContactDate: { stringValue: new Date().toISOString() }
+          }
+        })
+      });
+      existingLead.notes = updatedNotes;
+      return true;
+    } catch (patchErr) {
+      console.error('Error actualizando cliente existente:', patchErr.message);
+      return false;
+    }
+  }
+
+  // 2. Si no existe, insertar nuevo documento único
   try {
     const firestorePayload = {
       fields: {
         name: { stringValue: name || 'Cliente WhatsApp' },
-        phone: { stringValue: phone },
-        displayPhone: { stringValue: displayPhone || phone },
+        phone: { stringValue: cleanPh },
+        displayPhone: { stringValue: displayPhone || cleanPh },
         service: { stringValue: service || 'Contacto Inicial WhatsApp' },
         notes: { stringValue: notes || '' },
         status: { stringValue: 'prospecto' },
@@ -348,7 +414,7 @@ async function saveLeadToFirestore({ name, phone, displayPhone, service, notes, 
         createdAt: { stringValue: new Date().toISOString() },
         source: { stringValue: source || 'whatsapp_auto' },
         tenantId: { stringValue: String(tenantId) },
-        eventId: { stringValue: eventId || `wa_${phone}_${Date.now()}` }
+        eventId: { stringValue: eventId || `wa_${cleanPh}_${Date.now()}` }
       }
     };
 
@@ -359,7 +425,16 @@ async function saveLeadToFirestore({ name, phone, displayPhone, service, notes, 
     });
 
     if (response.ok) {
-      console.log(`🎉 [Auto-Captura] Lead ${name} (+${phone}) guardado en Firestore! (Origen: ${source})`);
+      const resData = await response.json();
+      const newId = resData.name ? resData.name.split('/').pop() : '';
+      console.log(`🎉 [Auto-Captura] Nuevo lead único ${name} (+${cleanPh}) guardado en Firestore! (Origen: ${source})`);
+      existingFirestoreLeadsByPhone.set(cleanPh, {
+        id: newId,
+        name: name || 'Cliente WhatsApp',
+        status: 'prospecto',
+        amount: 0,
+        notes: notes || ''
+      });
       return true;
     } else {
       console.error('Error guardando lead en Firestore:', await response.text());
