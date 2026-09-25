@@ -15,13 +15,14 @@ const ACCESS_TOKEN = tokenMatch ? tokenMatch[1].trim() : '';
 const DATASET_ID = datasetMatch ? datasetMatch[1].trim() : '1368429478371391';
 
 // 2. Obtener el código de prueba desde argumento de línea de comandos o variable
-// Ejemplo de uso: node test_event.js TEST12345
+// Ejemplo de uso: node test_event.js TEST12345 [lead|purchase]
 const TEST_EVENT_CODE = process.argv[2] || process.env.TEST_EVENT_CODE;
+const EVENT_TYPE = (process.argv[3] || 'lead').toLowerCase();
 
 if (!TEST_EVENT_CODE) {
   console.log('\n⚠️  ATENCIÓN: No proporcionaste el código de prueba de Meta.');
-  console.log('📌 Uso: node test_event.js <TU_TEST_EVENT_CODE>');
-  console.log('👉 Ejemplo: node test_event.js TEST83741\n');
+  console.log('📌 Uso: node test_event.js <TU_TEST_EVENT_CODE> [lead|purchase]');
+  console.log('👉 Ejemplo: node test_event.js TEST83741 lead\n');
   process.exit(1);
 }
 
@@ -30,41 +31,71 @@ function hashSha256(value) {
   return crypto.createHash('sha256').update(value.trim().toLowerCase()).digest('hex');
 }
 
-// 4. Datos de prueba simulando un cierre de venta por WhatsApp en Ecuador
-const rawPhone = '+593991952889'; // Ejemplo de teléfono
-const cleanPhone = rawPhone.replace(/\D/g, ''); // 593991952889
+// 4. Datos de prueba con alta calidad de coincidencia (EMQ)
+const rawPhone = '+593980649007'; // Número de prueba
+const cleanPhone = rawPhone.replace(/\D/g, ''); // 593980649007
 const hashedPhone = hashSha256(cleanPhone);
 
-const rawEmail = 'cliente.ejemplo@gmail.com';
+const rawEmail = 'contacto.kindev@gmail.com';
 const hashedEmail = hashSha256(rawEmail);
+const hashedFirstName = hashSha256('Miyako');
+const hashedCountry = hashSha256('ec');
 
-// 5. Construir payload oficial de Meta CAPI
+// Identificadores de clic y navegador de Meta (fbc & fbp)
+const fakeFbp = `fb.1.${Date.now()}.${Math.floor(1000000000 + Math.random() * 9000000000)}`;
+const fakeFbc = `fb.1.${Date.now()}.IwAR${Math.random().toString(36).substring(2, 15)}`;
+const eventId = `test_${EVENT_TYPE}_${Date.now()}`;
+
+// 5. Construir payload oficial de Meta CAPI optimizado
+const isPurchase = EVENT_TYPE === 'purchase';
+const isWhatsApp = EVENT_TYPE === 'whatsapp';
+
 const payload = {
   data: [
     {
-      event_name: 'Purchase', // Evento de compra
-      event_time: Math.floor(Date.now() / 1000), // Epoch timestamp actual
-      action_source: 'system_generated', // Evento offline/backend
-      event_id: `kindev_order_${Date.now()}`, // ID único para deduplicación
-      user_data: {
-        ph: [hashedPhone],
-        em: [hashedEmail],
-        client_user_agent: 'Kindev-Server-CAPI/1.0'
-      },
-      custom_data: {
-        currency: 'USD',
-        value: 120.00, // Monto de la venta (ej. Web Corporativa Base)
-        order_id: `KD-${Date.now().toString().slice(-6)}`
-      },
+      event_name: isPurchase ? 'Purchase' : isWhatsApp ? 'LeadSubmitted' : 'Lead',
+      event_time: Math.floor(Date.now() / 1000),
+      action_source: isWhatsApp ? 'business_messaging' : 'website',
+      ...(isWhatsApp ? { messaging_channel: 'whatsapp' } : {}),
+      event_id: eventId,
+      user_data: isWhatsApp
+        ? {
+            ph: [hashedPhone],
+            em: [hashedEmail],
+            fn: [hashedFirstName],
+            country: [hashedCountry]
+          }
+        : {
+            ph: [hashedPhone],
+            em: [hashedEmail],
+            fn: [hashedFirstName],
+            country: [hashedCountry],
+            fbc: fakeFbc,
+            fbp: fakeFbp,
+            client_user_agent: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36'
+          },
+      custom_data: isPurchase
+        ? {
+            currency: 'USD',
+            value: 120.00,
+            order_id: `KD-${Date.now().toString().slice(-6)}`
+          }
+        : {
+            service: 'Página Web Corporativa Base',
+            lead_type: 'WhatsApp Direct Chat'
+          },
       test_event_code: TEST_EVENT_CODE
     }
   ]
 };
 
-console.log('🚀 Enviando evento de prueba a Meta Conversions API...');
-console.log(`📦 Dataset ID: ${DATASET_ID}`);
-console.log(`🔑 Test Code:  ${TEST_EVENT_CODE}`);
-console.log(`💰 Valor:      $120.00 USD (Evento: Purchase)`);
+console.log('🚀 Enviando evento de prueba optimizado a Meta CAPI...');
+console.log(`📦 Dataset ID:    ${DATASET_ID}`);
+console.log(`🔑 Test Code:     ${TEST_EVENT_CODE}`);
+console.log(`🎯 Evento:        ${isPurchase ? 'Purchase ($120 USD)' : 'Lead (Cliente Potencial)'}`);
+console.log(`🌐 Action Source: ${isPurchase ? 'website' : 'business_messaging'}`);
+console.log(`🆔 Event ID:      ${eventId}`);
+console.log(`🍪 fbc & fbp:     Inyectados (Máxima coincidencia EMQ)`);
 
 try {
   const url = `https://graph.facebook.com/v19.0/${DATASET_ID}/events?access_token=${ACCESS_TOKEN}`;

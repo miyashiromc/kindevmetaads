@@ -1,5 +1,5 @@
-import React from 'react';
-import { MessageCircle, DollarSign, Trash2, CheckCircle, Clock, User, XCircle, Edit3 } from 'lucide-react';
+import React, { useState } from 'react';
+import { MessageCircle, DollarSign, Trash2, CheckCircle, Clock, User, XCircle, Edit3, Pencil, Check, X } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
 
 interface LeadCardProps {
@@ -7,11 +7,32 @@ interface LeadCardProps {
   onOpenSale: (lead: Lead) => void;
   onUpdateStatus: (id: string, status: LeadStatus) => void;
   onDelete: (id: string) => void;
+  onUpdateName?: (id: string, newName: string) => Promise<void>;
 }
 
-export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateStatus, onDelete }) => {
+export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateStatus, onDelete, onUpdateName }) => {
   const isClosed = lead.status === 'cerrado';
   const waLink = `https://wa.me/${lead.phone}`;
+
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [nameValue, setNameValue] = useState(lead.name);
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleSaveName = async () => {
+    if (!onUpdateName || !nameValue.trim()) {
+      setIsEditingName(false);
+      return;
+    }
+    try {
+      setIsSaving(true);
+      await onUpdateName(lead.id, nameValue.trim());
+      setIsEditingName(false);
+    } catch {
+      // error handled in toast
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
   const getStatusBadge = () => {
     switch (lead.status) {
@@ -72,11 +93,67 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
       {/* Datos del Cliente */}
       <div className="space-y-1.5 flex-1">
         <div className="flex items-center gap-2.5 flex-wrap">
-          <h4 className="font-bold text-slate-900 text-base">{lead.name}</h4>
+          {isEditingName ? (
+            <div className="flex items-center gap-1.5 my-0.5">
+              <input
+                type="text"
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleSaveName();
+                  if (e.key === 'Escape') setIsEditingName(false);
+                }}
+                autoFocus
+                disabled={isSaving}
+                placeholder="Nombre del cliente..."
+                className="text-sm font-bold text-slate-900 bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-1.5 focus:ring-violet-500 focus:border-violet-500 shadow-inner"
+              />
+              <button
+                type="button"
+                onClick={handleSaveName}
+                disabled={isSaving || !nameValue.trim()}
+                className="p-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white transition-all shrink-0 active:scale-95 touch-manipulation"
+                title="Guardar nombre"
+              >
+                <Check className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditingName(false)}
+                disabled={isSaving}
+                className="p-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 transition-all shrink-0 active:scale-95 touch-manipulation"
+                title="Cancelar edición"
+              >
+                <X className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-1.5">
+              <h4 className="font-bold text-slate-900 text-base">{lead.name}</h4>
+              {onUpdateName && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setNameValue(lead.name);
+                    setIsEditingName(true);
+                  }}
+                  className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors shrink-0 touch-manipulation"
+                  title="Modificar nombre"
+                >
+                  <Pencil className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          )}
           {getStatusBadge()}
           {lead.source === 'whatsapp_auto' && (
             <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
               ⚡ Auto-WhatsApp
+            </span>
+          )}
+          {lead.source === 'whatsapp_outreach' && (
+            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-50 text-indigo-700 border border-indigo-200" title="Respuesta calificada a prospección en frío">
+              🎯 Prospección
             </span>
           )}
         </div>

@@ -6,6 +6,8 @@ export interface MetaEventRecord {
   currency?: string;
   date: string;
   fbtraceId?: string;
+  eventId?: string;
+  actionSource?: string;
   testMode?: boolean;
 }
 
@@ -21,7 +23,7 @@ export interface Lead {
   amount: number;
   createdAt: string;
   saleDate?: string;
-  source?: 'manual' | 'whatsapp_auto';
+  source?: 'manual' | 'whatsapp_auto' | 'whatsapp_outreach';
   adSource?: string;
   hostingExpiryDate?: string;
   domainExpiryDate?: string;
@@ -29,6 +31,11 @@ export interface Lead {
   followUpNote?: string;
   tenantId?: string; // ID del cliente o 'kindev'
   metaEvents: MetaEventRecord[];
+  eventId?: string;
+  fbc?: string;
+  fbp?: string;
+  clientIp?: string;
+  clientUserAgent?: string;
 }
 
 export interface ClientAccount {

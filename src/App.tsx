@@ -14,6 +14,7 @@ import {
   UserRole
 } from './types';
 import { dispatchMetaCAPI } from './lib/meta-capi';
+import { getFbc, getFbp, generateEventId, trackPixelEvent } from './lib/meta-tracker';
 import { SecurityGate } from './components/SecurityGate';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
@@ -476,8 +477,16 @@ export const App: React.FC = () => {
     const isClosed = Boolean(data.isClosedImmediately);
     let initialEvents: MetaEventRecord[] = [];
 
+    const fbc = getFbc() || undefined;
+    const fbp = getFbp() || undefined;
+
     try {
       if (isClosed && saleAmount > 0) {
+        const purchaseEventId = generateEventId('purchase');
+
+        // Disparar en Píxel de Meta con clave de deduplicación
+        trackPixelEvent('Purchase', { value: saleAmount, currency: 'USD' }, purchaseEventId);
+
         // Enviar compra inmediatamente a Meta con credenciales del tenant activo
         const tenantMetaCreds = activeTenantId !== 'kindev' && activeTenant?.metaConfig?.datasetId
           ? {
@@ -493,6 +502,10 @@ export const App: React.FC = () => {
             name: data.name,
             value: saleAmount,
             currency: 'USD',
+            eventId: purchaseEventId,
+            actionSource: 'website',
+            fbc,
+            fbp,
             testMode: activeTenant.metaConfig.testMode,
             testEventCode: activeTenant.metaConfig.testEventCode
           },
@@ -505,9 +518,13 @@ export const App: React.FC = () => {
           currency: 'USD',
           date: new Date().toISOString(),
           fbtraceId: capiRes.fbtraceId,
+          eventId: purchaseEventId,
+          actionSource: 'website',
           testMode: activeTenant.metaConfig.testMode
         }];
       }
+
+      const leadEventId = generateEventId('lead');
 
       const newLeadData = {
         name: data.name,
@@ -521,6 +538,9 @@ export const App: React.FC = () => {
         source: 'manual' as const,
         tenantId: activeTenantId,
         metaEvents: initialEvents,
+        eventId: leadEventId,
+        fbc,
+        fbp,
         ...(isClosed ? { saleDate: new Date().toISOString() } : {})
       };
 
@@ -540,11 +560,19 @@ export const App: React.FC = () => {
         showToast(`¡Venta de $${saleAmount.toFixed(2)} USD registrada y enviada a Meta!`, 'success');
       } else {
         showToast(`Prospecto ${data.name} registrado con éxito`, 'success');
-        // Despacho opcional silencioso de evento Lead a Meta CAPI
+        
+        // 1. Disparar Píxel en navegador con deduplicación
+        trackPixelEvent('Lead', { content_name: data.service, currency: 'USD', value: 0 }, leadEventId);
+
+        // 2. Despacho a Meta CAPI con mismo eventId
         dispatchMetaCAPI({
           eventName: 'Lead',
           phone: data.phone,
           name: data.name,
+          eventId: leadEventId,
+          actionSource: 'website',
+          fbc,
+          fbp,
           testMode: config.testMode,
           testEventCode: config.testEventCode
         }).catch((capiErr) => console.log('CAPI Lead background warning:', capiErr));
@@ -573,11 +601,37 @@ export const App: React.FC = () => {
     }
   };
 
+  const handleUpdateLeadName = async (id: string, newName: string) => {
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    try {
+      if (firestoreConnected) {
+        const leadRef = doc(db, 'leads', id);
+        await updateDoc(leadRef, { name: trimmed });
+      }
+      const updated = leads.map((l) => (l.id === id ? { ...l, name: trimmed } : l));
+      setLeads(updated);
+      localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
+      showToast('Nombre actualizado correctamente', 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al actualizar nombre';
+      showToast(msg, 'error');
+      throw err;
+    }
+  };
+
   const handleConfirmSale = async (leadId: string, amount: number, note?: string) => {
     const targetLead = leads.find((l) => l.id === leadId);
     if (!targetLead) return;
 
     try {
+      const purchaseEventId = generateEventId('purchase');
+      const fbc = targetLead.fbc || getFbc() || undefined;
+      const fbp = targetLead.fbp || getFbp() || undefined;
+
+      // Disparar en Píxel del navegador con eventID para deduplicación
+      trackPixelEvent('Purchase', { value: amount, currency: 'USD' }, purchaseEventId);
+
       // 1. Despachar a Meta CAPI con SHA-256 (usando credenciales del tenant si aplica)
       const tenantMetaCreds = activeTenantId !== 'kindev' && activeTenant?.metaConfig?.datasetId
         ? {
@@ -594,6 +648,10 @@ export const App: React.FC = () => {
           value: amount,
           currency: 'USD',
           leadId: targetLead.id,
+          eventId: purchaseEventId,
+          actionSource: targetLead.source === 'whatsapp_auto' ? 'business_messaging' : 'website',
+          fbc,
+          fbp,
           testMode: activeTenant.metaConfig.testMode,
           testEventCode: activeTenant.metaConfig.testEventCode
         },
@@ -606,6 +664,8 @@ export const App: React.FC = () => {
         currency: 'USD',
         date: new Date().toISOString(),
         fbtraceId: capiRes.fbtraceId,
+        eventId: purchaseEventId,
+        actionSource: targetLead.source === 'whatsapp_auto' ? 'business_messaging' : 'website',
         testMode: activeTenant.metaConfig.testMode
       };
 
@@ -862,6 +922,7 @@ export const App: React.FC = () => {
             onUpdateStatus={handleUpdateStatus}
             onOpenSaleModal={(lead) => setSaleLead(lead)}
             onAddNewLead={() => setActiveTab('quick_list')}
+            onUpdateName={handleUpdateLeadName}
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebarCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           />
@@ -992,6 +1053,7 @@ export const App: React.FC = () => {
                         onOpenSale={(l) => setSaleLead(l)}
                         onUpdateStatus={handleUpdateStatus}
                         onDelete={handleDelete}
+                        onUpdateName={handleUpdateLeadName}
                       />
                     ))}
                   </div>

@@ -8,7 +8,10 @@ import {
   Search,
   Maximize2,
   Minimize2,
-  DollarSign
+  DollarSign,
+  Pencil,
+  Check,
+  X
 } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
 
@@ -17,6 +20,7 @@ interface KanbanBoardProps {
   onUpdateStatus: (leadId: string, newStatus: LeadStatus) => Promise<void>;
   onOpenSaleModal: (lead: Lead) => void;
   onAddNewLead: () => void;
+  onUpdateName?: (leadId: string, newName: string) => Promise<void>;
   isSidebarCollapsed?: boolean;
   onToggleSidebarCollapse?: () => void;
 }
@@ -78,6 +82,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   onUpdateStatus,
   onOpenSaleModal,
   onAddNewLead,
+  onUpdateName,
   isSidebarCollapsed,
   onToggleSidebarCollapse
 }) => {
@@ -85,6 +90,9 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [activeDropCol, setActiveDropCol] = useState<LeadStatus | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
   const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
+  const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
+  const [editNameValue, setEditNameValue] = useState<string>('');
+  const [isSavingName, setIsSavingName] = useState<boolean>(false);
   const columnsContainerRef = React.useRef<HTMLDivElement>(null);
 
   const scrollToStage = (status: LeadStatus, index: number) => {
@@ -185,6 +193,32 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     } else {
       await onUpdateStatus(lead.id, target);
     }
+  };
+
+  const handleStartEditName = (lead: Lead) => {
+    setEditingLeadId(lead.id);
+    setEditNameValue(lead.name);
+  };
+
+  const handleSaveName = async (leadId: string) => {
+    if (!onUpdateName || !editNameValue.trim()) {
+      setEditingLeadId(null);
+      return;
+    }
+    try {
+      setIsSavingName(true);
+      await onUpdateName(leadId, editNameValue.trim());
+      setEditingLeadId(null);
+    } catch {
+      // Error handled by parent toast
+    } finally {
+      setIsSavingName(false);
+    }
+  };
+
+  const handleCancelEditName = () => {
+    setEditingLeadId(null);
+    setEditNameValue('');
   };
 
   return (
@@ -377,16 +411,80 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     return (
                       <div
                         key={lead.id}
-                        draggable
+                        draggable={editingLeadId !== lead.id}
                         onDragStart={(e) => handleDragStart(e, lead.id)}
                         className="bg-white rounded-xl p-3.5 border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-slate-300 transition-all cursor-grab active:cursor-grabbing space-y-2.5 group"
                       >
                         {/* Nombre del Cliente y Monto */}
                         <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0">
-                            <h4 className="text-xs font-extrabold text-slate-900 truncate">
-                              {lead.name}
-                            </h4>
+                          <div className="min-w-0 flex-1">
+                            {editingLeadId === lead.id ? (
+                              <div
+                                className="flex items-center gap-1.5 my-0.5"
+                                onClick={(e) => e.stopPropagation()}
+                                onMouseDown={(e) => e.stopPropagation()}
+                              >
+                                <input
+                                  type="text"
+                                  value={editNameValue}
+                                  onChange={(e) => setEditNameValue(e.target.value)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === 'Enter') {
+                                      e.preventDefault();
+                                      handleSaveName(lead.id);
+                                    } else if (e.key === 'Escape') {
+                                      e.preventDefault();
+                                      handleCancelEditName();
+                                    }
+                                  }}
+                                  autoFocus
+                                  disabled={isSavingName}
+                                  placeholder="Nombre o negocio..."
+                                  className="w-full text-xs font-bold text-slate-900 bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1.5 focus:ring-violet-500 focus:border-violet-500 shadow-inner"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleSaveName(lead.id)}
+                                  disabled={isSavingName || !editNameValue.trim()}
+                                  className="p-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white transition-all shrink-0 active:scale-95 touch-manipulation"
+                                  title="Guardar nombre"
+                                >
+                                  <Check className="w-3.5 h-3.5" />
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={handleCancelEditName}
+                                  disabled={isSavingName}
+                                  className="p-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 transition-all shrink-0 active:scale-95 touch-manipulation"
+                                  title="Cancelar edición"
+                                >
+                                  <X className="w-3.5 h-3.5" />
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-center gap-1.5 group/title">
+                                <h4
+                                  className="text-xs font-extrabold text-slate-900 truncate"
+                                  title={lead.name}
+                                >
+                                  {lead.name}
+                                </h4>
+                                {onUpdateName && (
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      handleStartEditName(lead);
+                                    }}
+                                    className="p-0.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors shrink-0 touch-manipulation"
+                                    title="Modificar nombre del cliente"
+                                  >
+                                    <Pencil className="w-3 h-3" />
+                                  </button>
+                                )}
+                              </div>
+                            )}
+
                             <a
                               href={`https://wa.me/${lead.phone}`}
                               target="_blank"

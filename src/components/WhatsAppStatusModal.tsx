@@ -18,6 +18,7 @@ export const WhatsAppStatusModal: React.FC<WhatsAppStatusModalProps> = ({
   onShowToast,
 }) => {
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isSyncing, setIsSyncing] = useState(false);
 
   if (!isOpen) return null;
 
@@ -32,6 +33,24 @@ export const WhatsAppStatusModal: React.FC<WhatsAppStatusModalProps> = ({
       onShowToast('No se pudo verificar el estado local.', 'error');
     } finally {
       setIsRefreshing(false);
+    }
+  };
+
+  const handleSyncRetroactive = async () => {
+    setIsSyncing(true);
+    try {
+      const res = await fetch('http://localhost:3000/api/whatsapp/sync-retroactive');
+      const data = await res.json();
+      if (data.success) {
+        onShowToast(`Sincronización completa: ${data.message || 'Chats sincronizados con éxito'}`, 'success');
+        await onRefresh();
+      } else {
+        onShowToast(data.error || 'No se pudo sincronizar el historial.', 'error');
+      }
+    } catch {
+      onShowToast('Servidor local no disponible para sincronización.', 'error');
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -113,10 +132,10 @@ export const WhatsAppStatusModal: React.FC<WhatsAppStatusModalProps> = ({
             </div>
 
             <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
-              <span className="text-slate-500 font-medium">Filtro de Anuncios:</span>
+              <span className="text-slate-500 font-medium">Filtro de Mensajes:</span>
               <span className="text-emerald-700 font-semibold flex items-center gap-1">
                 <ShieldCheck className="w-3.5 h-3.5" />
-                Estricto (Solo leads de Meta Ads)
+                Bimodal (Inbound Total + Prospección Calificada)
               </span>
             </div>
 
@@ -144,26 +163,37 @@ export const WhatsAppStatusModal: React.FC<WhatsAppStatusModalProps> = ({
           )}
 
           {/* Acciones Rápidas */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
             <a
               href="http://localhost:3000/qr"
               target="_blank"
               rel="noopener noreferrer"
-              className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all shadow-sm active:scale-95 text-center"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-900 text-white font-bold text-xs hover:bg-slate-800 transition-all shadow-sm active:scale-95 text-center"
             >
               <QrCode className="w-4 h-4" />
-              <span>Vincular / Escanear QR</span>
-              <ExternalLink className="w-3.5 h-3.5 opacity-60" />
+              <span>Vincular QR</span>
+              <ExternalLink className="w-3 h-3 opacity-60" />
             </a>
 
             <button
               type="button"
               onClick={handleManualCheck}
               disabled={isRefreshing}
-              className="flex items-center justify-center gap-2 py-2.5 px-4 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs transition-all active:scale-95 disabled:opacity-50"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 border border-slate-200 text-slate-700 font-bold text-xs transition-all active:scale-95 disabled:opacity-50"
             >
               <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-              <span>Comprobar Conexión</span>
+              <span>Comprobar</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleSyncRetroactive}
+              disabled={isSyncing || !isConnected}
+              title="Recupera mensajes atrasados recibidos durante desconexión"
+              className="flex items-center justify-center gap-1.5 py-2.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 text-emerald-800 font-bold text-xs transition-all active:scale-95 disabled:opacity-50"
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${isSyncing ? 'animate-spin text-emerald-600' : ''}`} />
+              <span>Sincronizar</span>
             </button>
           </div>
 

@@ -10,6 +10,7 @@ build/
 
 # Client PII and local DB
 data/leads.json
+outbound_tracker.json
 *.tsbuildinfo
 auth_baileys/
 logs/

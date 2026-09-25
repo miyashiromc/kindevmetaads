@@ -1,3 +1,5 @@
+import { getFbc, getFbp, generateEventId } from './meta-tracker';
+
 export const META_DATASET_ID = '1368429478371391';
 const DEFAULT_TOKEN = 'EAAPkgvHBCxEBSoXtA0OwkEVoNIaZCjVsz77WQxWTsbo9cTMRCuhDIO6cF5Fe40fPi4jxrRF0nfFFSLumbTfumZCPGq4hO1C6KwldQESlPPUdqyZA5Dc6SLZCRVL2QY9ZB9aybQ0xTlYWrimR7lxQqGXFig1Qrb5lBv1ZCZCZCA24e4eotiELUVuvwIzJuYMyXAZDZD';
 
@@ -113,6 +115,12 @@ export interface DispatchParams {
   value?: number;
   currency?: string;
   leadId?: string;
+  eventId?: string;
+  actionSource?: 'website' | 'business_messaging' | 'system_generated' | 'chat';
+  fbc?: string;
+  fbp?: string;
+  clientIp?: string;
+  clientUserAgent?: string;
   countryCode?: string;
   testMode?: boolean;
   testEventCode?: string;
@@ -144,7 +152,16 @@ export async function dispatchMetaCAPI(
   const hashedCountry = country ? await hashSha256(country) : null;
   const hashedExternalId = params.leadId ? await hashSha256(params.leadId.trim()) : null;
 
-  const resolvedEventId = `kd_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+  // Clave de Deduplicación oficial de Meta: compartido entre Píxel y CAPI
+  const resolvedEventId = params.eventId || generateEventId(params.eventName);
+
+  // Parámetros de atribución y coincidencia avanzada
+  const resolvedFbc = params.fbc || getFbc();
+  const resolvedFbp = params.fbp || getFbp();
+  const resolvedUserAgent = params.clientUserAgent || (typeof navigator !== 'undefined' && navigator.userAgent ? navigator.userAgent : 'Kindev-CAPI-Engine/2026');
+
+  // Fuente de la acción: business_messaging para WhatsApp directo, website para navegación web
+  const resolvedActionSource = params.actionSource || (params.eventName === 'Purchase' ? 'system_generated' : 'website');
 
   interface EventData {
     event_name: string;
@@ -157,6 +174,9 @@ export async function dispatchMetaCAPI(
       fn?: string[];
       country?: string[];
       external_id?: string[];
+      fbc?: string;
+      fbp?: string;
+      client_ip_address?: string;
       client_user_agent: string;
     };
     custom_data?: {
@@ -170,7 +190,7 @@ export async function dispatchMetaCAPI(
   const eventData: EventData = {
     event_name: params.eventName,
     event_time: Math.floor(Date.now() / 1000),
-    action_source: 'system_generated',
+    action_source: resolvedActionSource,
     event_id: resolvedEventId,
     user_data: {
       ...(hashedPhone ? { ph: [hashedPhone] } : {}),
@@ -178,7 +198,10 @@ export async function dispatchMetaCAPI(
       ...(hashedName ? { fn: [hashedName] } : {}),
       ...(hashedCountry ? { country: [hashedCountry] } : {}),
       ...(hashedExternalId ? { external_id: [hashedExternalId] } : {}),
-      client_user_agent: typeof navigator !== 'undefined' && navigator.userAgent ? navigator.userAgent : 'Kindev-React19-Dashboard/2026'
+      ...(resolvedFbc ? { fbc: resolvedFbc } : {}),
+      ...(resolvedFbp ? { fbp: resolvedFbp } : {}),
+      ...(params.clientIp ? { client_ip_address: params.clientIp } : {}),
+      client_user_agent: resolvedUserAgent
     }
   };
 

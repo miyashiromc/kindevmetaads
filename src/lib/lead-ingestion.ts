@@ -1,6 +1,7 @@
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
 import { db } from './firebase';
 import { formatPhoneNumber, dispatchMetaCAPI } from './meta-capi';
+import { getFbc, getFbp, generateEventId, trackPixelEvent } from './meta-tracker';
 import { LeadStatus } from '../types';
 
 export interface IngestLeadPayload {
@@ -16,6 +17,7 @@ export interface IngestResult {
   success: boolean;
   isDuplicate: boolean;
   leadId?: string;
+  eventId?: string;
   error?: string;
 }
 
@@ -41,6 +43,11 @@ export async function ingestIncomingLead(
       };
     }
 
+    const eventId = generateEventId('lead');
+    const fbc = getFbc() || undefined;
+    const fbp = getFbp() || undefined;
+    const actionSource = payload.source === 'whatsapp_auto' ? 'business_messaging' : 'website';
+
     const newLead = {
       name: payload.name?.trim() || 'Cliente WhatsApp',
       phone: cleanPhone,
@@ -52,17 +59,35 @@ export async function ingestIncomingLead(
       createdAt: new Date().toISOString(),
       source: payload.source || 'whatsapp_auto',
       tenantId: payload.tenantId || 'kindev',
-      metaEvents: []
+      metaEvents: [],
+      eventId,
+      fbc,
+      fbp
     };
 
     const docRef = await addDoc(leadsRef, newLead);
 
-    // Disparar evento Lead a Meta Conversions API en segundo plano con credenciales si existen
+    // 1. Disparar Píxel en navegador con eventID compartido para Deduplicación
+    trackPixelEvent(
+      'Lead',
+      {
+        content_name: newLead.service,
+        currency: 'USD',
+        value: 0
+      },
+      eventId
+    );
+
+    // 2. Disparar evento Lead a Meta Conversions API en segundo plano con mismo eventId
     dispatchMetaCAPI(
       {
         eventName: 'Lead',
         phone: cleanPhone,
         name: newLead.name,
+        eventId,
+        actionSource,
+        fbc,
+        fbp,
         testMode: config?.testMode,
         testEventCode: config?.testEventCode
       },
@@ -74,7 +99,8 @@ export async function ingestIncomingLead(
     return {
       success: true,
       isDuplicate: false,
-      leadId: docRef.id
+      leadId: docRef.id,
+      eventId
     };
   } catch (err: unknown) {
     const errorMsg = err instanceof Error ? err.message : 'Error en Firestore';
