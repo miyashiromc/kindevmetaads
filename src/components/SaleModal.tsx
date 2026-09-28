@@ -61,13 +61,16 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, targetStatus = 'cerr
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white border border-slate-200/90 rounded-3xl max-w-md w-full p-6 md:p-7 space-y-5 shadow-2xl relative max-h-[95vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
+      <div className="bg-white border-t sm:border border-slate-200/90 rounded-t-3xl sm:rounded-3xl max-w-md w-full p-5 sm:p-7 space-y-4 sm:space-y-5 shadow-2xl relative max-h-[92dvh] sm:max-h-[95vh] overflow-y-auto pb-safe sm:pb-7">
         
+        {/* Indicador de arrastre táctil para móvil */}
+        <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto -mt-1 mb-2 sm:hidden" />
+
         {/* Cerrar */}
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 transition-colors p-1 rounded-xl hover:bg-slate-100"
+          className="absolute top-4 sm:top-5 right-4 sm:right-5 text-slate-400 hover:text-slate-700 transition-colors p-2 rounded-xl hover:bg-slate-100 active:scale-95"
           aria-label="Cerrar modal"
         >
           <X className="w-5 h-5" />
@@ -75,28 +78,28 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, targetStatus = 'cerr
 
         {/* Encabezado */}
         <div>
-          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl mb-3 shadow-sm border ${
+          <div className={`w-10 h-10 sm:w-11 sm:h-11 rounded-2xl flex items-center justify-center text-xl mb-2.5 sm:mb-3 shadow-xs border ${
             targetStatus === 'anticipo'
               ? 'bg-violet-50 text-violet-600 border-violet-100'
               : 'bg-emerald-50 text-emerald-600 border-emerald-100'
           }`}>
-            <CheckCircle2 className="w-6 h-6" />
+            <CheckCircle2 className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">
+          <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">
             {targetStatus === 'anticipo' ? 'Registrar Anticipo & Enviar Purchase a Meta' : 'Cerrar Venta & Enviar a Meta'}
           </h3>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
+          <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">
             {targetStatus === 'anticipo' 
               ? 'Cliente asegurado. El evento Purchase se despachará de inmediato para acelerar el entrenamiento del algoritmo.' 
               : 'El proyecto se marcará como cerrado y el evento Purchase se despachará a Meta CAPI.'}
           </p>
-          <p className="text-xs text-slate-600 mt-1 font-semibold">
+          <p className="text-xs text-slate-600 mt-1.5 font-semibold">
             Cliente: <span className="font-bold text-slate-900">{lead.name}</span> (+<span className="font-mono text-slate-700">{lead.phone}</span>)
           </p>
         </div>
 
         {/* Campo de Precio Personalizado Principal */}
-        <div className="bg-slate-50 border-2 border-emerald-500/30 rounded-2xl p-4 text-center space-y-2">
+        <div className="bg-emerald-50/50 border border-emerald-500/25 rounded-2xl p-4 text-center space-y-2">
           <div className="flex items-center justify-center gap-1.5 text-xs font-bold text-emerald-800 uppercase tracking-wider">
             <Sparkles className="w-3.5 h-3.5 text-emerald-600" />
             <span>Monto de Venta Personalizable</span>
@@ -117,40 +120,40 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, targetStatus = 'cerr
             <span className="text-sm font-bold text-slate-500">USD</span>
           </div>
 
-          {/* Botones de micro-ajuste rápido */}
-          <div className="flex items-center justify-center gap-1.5 pt-1 flex-wrap">
+          {/* Botones de micro-ajuste rápido ergonómicos */}
+          <div className="flex items-center justify-center gap-1.5 pt-1.5 flex-wrap">
             <button
               type="button"
               onClick={() => adjustAmount(-50)}
-              className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-mono font-bold text-slate-600 shadow-sm transition-all flex items-center gap-0.5"
+              className="h-8 px-2.5 rounded-lg bg-white border border-slate-200/90 active:bg-slate-100 text-[11px] font-mono font-bold text-slate-700 shadow-xs transition-all flex items-center gap-0.5"
             >
               <Minus className="w-2.5 h-2.5" />50
             </button>
             <button
               type="button"
               onClick={() => adjustAmount(-10)}
-              className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-mono font-bold text-slate-600 shadow-sm transition-all flex items-center gap-0.5"
+              className="h-8 px-2.5 rounded-lg bg-white border border-slate-200/90 active:bg-slate-100 text-[11px] font-mono font-bold text-slate-700 shadow-xs transition-all flex items-center gap-0.5"
             >
               <Minus className="w-2.5 h-2.5" />10
             </button>
             <button
               type="button"
               onClick={() => adjustAmount(+10)}
-              className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-mono font-bold text-slate-600 shadow-sm transition-all flex items-center gap-0.5"
+              className="h-8 px-2.5 rounded-lg bg-white border border-slate-200/90 active:bg-slate-100 text-[11px] font-mono font-bold text-slate-700 shadow-xs transition-all flex items-center gap-0.5"
             >
               <Plus className="w-2.5 h-2.5" />10
             </button>
             <button
               type="button"
               onClick={() => adjustAmount(+50)}
-              className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-mono font-bold text-slate-600 shadow-sm transition-all flex items-center gap-0.5"
+              className="h-8 px-2.5 rounded-lg bg-white border border-slate-200/90 active:bg-slate-100 text-[11px] font-mono font-bold text-slate-700 shadow-xs transition-all flex items-center gap-0.5"
             >
               <Plus className="w-2.5 h-2.5" />50
             </button>
             <button
               type="button"
               onClick={() => adjustAmount(+100)}
-              className="px-2 py-1 rounded-lg bg-white border border-slate-200 hover:bg-slate-100 text-[11px] font-mono font-bold text-slate-600 shadow-sm transition-all flex items-center gap-0.5"
+              className="h-8 px-2.5 rounded-lg bg-white border border-slate-200/90 active:bg-slate-100 text-[11px] font-mono font-bold text-slate-700 shadow-xs transition-all flex items-center gap-0.5"
             >
               <Plus className="w-2.5 h-2.5" />100
             </button>

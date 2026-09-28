@@ -131,33 +131,38 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-150">
-      <div className="max-w-2xl w-full bg-white rounded-3xl border border-slate-200/90 shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+    <div className="fixed inset-0 z-50 bg-slate-950/75 backdrop-blur-sm flex items-end sm:items-center justify-center sm:p-4 animate-in fade-in duration-150">
+      <div className="max-w-2xl w-full bg-white rounded-t-3xl sm:rounded-3xl border-t sm:border border-slate-200/90 shadow-2xl overflow-hidden flex flex-col max-h-[92dvh] sm:max-h-[90vh]">
         
         {/* Cabecera del Modal */}
-        <div className="p-4 sm:p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-2xl bg-violet-600/10 border border-violet-600/20 text-violet-600 flex items-center justify-center font-bold">
-              <Building2 className="w-5 h-5" />
+        <div className="p-4 sm:p-6 border-b border-slate-100 bg-slate-50/50 shrink-0">
+          {/* Indicador de arrastre en móvil */}
+          <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto -mt-1 mb-2.5 sm:hidden" />
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-violet-600/10 border border-violet-600/20 text-violet-600 flex items-center justify-center font-bold shrink-0">
+                <Building2 className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base sm:text-lg font-black text-slate-900">
+                  {mode === 'list' ? 'Gestión Multi-Cliente (SaaS)' : editingClient ? 'Editar Cuenta de Cliente' : 'Conectar Nuevo Cliente'}
+                </h2>
+                <p className="text-xs text-slate-500 line-clamp-1 sm:line-clamp-none">
+                  {mode === 'list'
+                    ? 'Administra tus clientes, asigna Dataset IDs y controla accesos independientes'
+                    : 'Configura las credenciales de Meta CAPI y accesos para esta cuenta'}
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base sm:text-lg font-black text-slate-900">
-                {mode === 'list' ? 'Gestión Multi-Cliente (SaaS)' : editingClient ? 'Editar Cuenta de Cliente' : 'Conectar Nuevo Cliente'}
-              </h2>
-              <p className="text-xs text-slate-500">
-                {mode === 'list'
-                  ? 'Administra tus clientes, asigna Dataset IDs y controla accesos independientes'
-                  : 'Configura las credenciales de Meta CAPI y accesos para esta cuenta'}
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors active:scale-95"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Contenido según el modo */}
@@ -267,7 +272,7 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                             <button
                               type="button"
                               onClick={() => copyAccessInfo(client)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                              className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors active:scale-95"
                               title="Copiar accesos para el cliente"
                             >
                               {copiedKey === client.id ? (
@@ -280,7 +285,7 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                             <button
                               type="button"
                               onClick={() => openEditForm(client)}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-colors"
+                              className="w-8 h-8 rounded-lg text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors active:scale-95"
                               title="Editar configuración"
                             >
                               <Edit3 className="w-4 h-4" />
@@ -293,7 +298,7 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                                   onDeleteClient(client.id);
                                 }
                               }}
-                              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+                              className="w-8 h-8 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 flex items-center justify-center transition-colors active:scale-95"
                               title="Eliminar cliente"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -307,7 +312,7 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                               <button
                                 type="button"
                                 onClick={() => onSelectTenant(client.id)}
-                                className="text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-xl transition-colors"
+                                className="text-xs font-bold text-slate-800 bg-slate-100 hover:bg-slate-200 active:bg-slate-300 px-3 py-1.5 rounded-xl transition-colors"
                               >
                                 Ver Panel
                               </button>
@@ -488,15 +493,15 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
         </div>
 
         {/* Pie de modal */}
-        <div className="p-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
+        <div className="p-3.5 pb-safe sm:pb-3.5 bg-slate-50 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center gap-1.5">
             <ShieldCheck className="w-4 h-4 text-violet-600" />
-            <span>Aislamiento estricto de datos garantizado por Kindev S.A.S.</span>
+            <span className="text-[11px] sm:text-xs">Aislamiento de datos Kindev S.A.S.</span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="font-bold text-slate-700 hover:text-slate-900"
+            className="font-bold text-slate-700 hover:text-slate-900 py-1 px-2 rounded-lg"
           >
             Cerrar
           </button>

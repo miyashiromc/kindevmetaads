@@ -77,35 +77,40 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in">
-      <div className="relative w-full max-w-xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/75 backdrop-blur-sm sm:p-4 overflow-y-auto animate-fade-in">
+      <div className="relative w-full max-w-xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t sm:border border-slate-200 overflow-hidden my-0 sm:my-6 max-h-[92dvh] sm:max-h-[90vh] flex flex-col pb-safe sm:pb-0">
         
         {/* Encabezado */}
-        <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white border-b border-indigo-900/40">
-          <div className="flex items-center gap-3">
-            <div className="p-2.5 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300">
-              <Key className="w-5 h-5" />
+        <div className="px-5 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-slate-900 to-indigo-950 text-white border-b border-indigo-900/40 shrink-0">
+          {/* Indicador táctil en móvil */}
+          <div className="w-12 h-1 bg-white/20 rounded-full mx-auto -mt-1 mb-3 sm:hidden" />
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 rounded-2xl bg-indigo-500/20 border border-indigo-400/30 text-indigo-300">
+                <Key className="w-5 h-5" />
+              </div>
+              <div>
+                <h2 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
+                  Conectar Meta Graph & Marketing API
+                </h2>
+                <p className="text-xs text-indigo-200/80">
+                  Sincronización en vivo de métricas, pauta y atribución
+                </p>
+              </div>
             </div>
-            <div>
-              <h2 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
-                Conectar Meta Graph & Marketing API
-              </h2>
-              <p className="text-xs text-indigo-200/80">
-                Sincronización en vivo de métricas, pauta y atribución
-              </p>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="p-2 rounded-xl text-indigo-200 hover:text-white hover:bg-white/10 transition-all active:scale-95"
+              title="Cerrar modal"
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="p-2 rounded-xl text-indigo-200 hover:text-white hover:bg-white/10 transition-all active:scale-95"
-            title="Cerrar modal"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
-        <div className="p-6 space-y-5 max-h-[80vh] overflow-y-auto">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
 
           {/* Tarjeta de Estado Actual de la API */}
           <div className={`p-4 rounded-2xl border transition-all ${

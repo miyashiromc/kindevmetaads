@@ -1,4 +1,4 @@
-﻿import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { X, ShieldCheck, Eye, EyeOff, FlaskConical, Save, Zap, Copy, Check, Send, Sparkles } from 'lucide-react';
 import { MetaConfig } from '../types';
 import { getStoredMetaToken } from '../lib/meta-capi';
@@ -106,12 +106,15 @@ export const ConfigModal: React.FC<ConfigModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-      <div className="bg-white border border-slate-200/90 rounded-3xl max-w-lg w-full p-6 md:p-7 space-y-5 shadow-2xl relative max-h-[95vh] overflow-y-auto">
+    <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center sm:p-4 animate-fade-in">
+      <div className="bg-white border-t sm:border border-slate-200/90 rounded-t-3xl sm:rounded-3xl max-w-lg w-full p-5 sm:p-7 space-y-4 sm:space-y-5 shadow-2xl relative max-h-[92dvh] sm:max-h-[95vh] overflow-y-auto pb-safe sm:pb-7">
         
+        {/* Indicador de arrastre táctil para móvil */}
+        <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto -mt-1 mb-2 sm:hidden" />
+
         <button
           onClick={onClose}
-          className="absolute top-5 right-5 text-slate-400 hover:text-slate-700 transition-colors p-1 rounded-xl hover:bg-slate-100"
+          className="absolute top-4 sm:top-5 right-4 sm:right-5 text-slate-400 hover:text-slate-700 transition-colors p-2 rounded-xl hover:bg-slate-100 active:scale-95"
           aria-label="Cerrar modal"
         >
           <X className="w-5 h-5" />
@@ -119,11 +122,11 @@ export const ConfigModal: React.FC<ConfigModalProps> = ({
 
         {/* Encabezado */}
         <div>
-          <div className="w-11 h-11 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center text-xl mb-3 shadow-sm border border-violet-100">
-            <ShieldCheck className="w-6 h-6" />
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-violet-50 text-violet-600 flex items-center justify-center text-xl mb-2 sm:mb-3 shadow-xs border border-violet-100">
+            <ShieldCheck className="w-5 h-5 sm:w-6 sm:h-6" />
           </div>
-          <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Configuración & Automatizaciones</h3>
-          <p className="text-xs text-slate-500 mt-1 font-medium">
+          <h3 className="text-lg sm:text-xl font-extrabold text-slate-900 tracking-tight">Configuración & Automatizaciones</h3>
+          <p className="text-xs text-slate-500 mt-1 font-medium leading-relaxed">
             Conexión con Meta CAPI y receptor automático de prospectos de WhatsApp.
           </p>
         </div>

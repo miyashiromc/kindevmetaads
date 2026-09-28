@@ -71,11 +71,11 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
     <div className="space-y-4 sm:space-y-6 animate-fade-in">
       
       {/* Encabezado */}
-      <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <div className="bg-white/85 backdrop-blur-sm p-4 sm:p-5 rounded-2xl border border-slate-200/70 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div>
           <h2 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             <span>Centro de Seguimiento Comercial</span>
-            <span className="text-[10px] sm:text-xs font-semibold px-2 py-0.5 rounded-full bg-amber-100 text-amber-900">
+            <span className="text-[10px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full bg-amber-50 text-amber-900 border border-amber-200/80">
               {pendingLeads.length} {pendingLeads.length === 1 ? 'contacto' : 'contactos'}
             </span>
           </h2>
@@ -86,7 +86,7 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
       </div>
 
       {pendingLeads.length === 0 ? (
-        <div className="bg-white p-8 sm:p-12 rounded-2xl sm:rounded-3xl border border-dashed border-slate-200 text-center space-y-2">
+        <div className="bg-white/85 backdrop-blur-sm p-8 sm:p-12 rounded-2xl border border-dashed border-slate-200 text-center space-y-2">
           <CheckCircle className="w-8 h-8 text-emerald-500 mx-auto" />
           <h3 className="text-sm font-bold text-slate-800">¡Al día! No hay prospectos pendientes</h3>
           <p className="text-xs text-slate-500">
@@ -109,14 +109,14 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                     key={lead.id}
                     type="button"
                     onClick={() => setSelectedLeadId(lead.id)}
-                    className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border active:scale-95 touch-manipulation ${
+                    className={`px-3.5 py-2.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border active:scale-95 touch-manipulation min-h-[42px] ${
                       isSelected
-                        ? 'bg-violet-600 text-white border-violet-600 shadow-md ring-2 ring-violet-500/20'
-                        : 'bg-white text-slate-700 border-slate-200 shadow-2xs hover:bg-slate-50'
+                        ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900/10'
+                        : 'bg-white text-slate-700 border-slate-200/80 shadow-xs hover:bg-slate-50'
                     }`}
                   >
                     <span>{lead.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono ${
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
                       isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
                     }`}>
                       +{lead.phone.slice(-4)}
@@ -128,7 +128,7 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
           </div>
 
           {/* Columna Izquierda: Lista de Clientes en Escritorio */}
-          <div className="hidden lg:block lg:col-span-5 bg-white rounded-3xl border border-slate-200/90 shadow-2xs p-4 space-y-3">
+          <div className="hidden lg:block lg:col-span-5 bg-white/85 backdrop-blur-sm rounded-2xl border border-slate-200/70 shadow-xs p-4 space-y-3">
             <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2">
               Prospectos por Atención
             </h3>
@@ -138,11 +138,11 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                 const hours = getHoursSinceContact(lead.createdAt);
                 const isSelected = (selectedLead?.id === lead.id);
 
-                let badge = { text: 'Hoy', color: 'bg-emerald-100 text-emerald-800' };
+                let badge = { text: 'Hoy', color: 'bg-emerald-50 text-emerald-800 border-emerald-200/60' };
                 if (hours >= 48) {
-                  badge = { text: `+${Math.floor(hours / 24)} días sin hablar`, color: 'bg-rose-100 text-rose-800' };
+                  badge = { text: `+${Math.floor(hours / 24)}d inactivo`, color: 'bg-rose-50 text-rose-800 border-rose-200/60' };
                 } else if (hours >= 24) {
-                  badge = { text: 'Hace 24h', color: 'bg-amber-100 text-amber-900' };
+                  badge = { text: 'Hace 24h', color: 'bg-amber-50 text-amber-900 border-amber-200/60' };
                 }
 
                 return (
@@ -152,8 +152,8 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                     onClick={() => setSelectedLeadId(lead.id)}
                     className={`w-full text-left p-3.5 rounded-2xl border transition-all flex items-center justify-between gap-3 ${
                       isSelected
-                        ? 'border-violet-500 bg-violet-50/60 shadow-sm ring-1 ring-violet-500/30'
-                        : 'border-slate-200/80 bg-slate-50/50 hover:bg-slate-50'
+                        ? 'border-violet-500 bg-violet-50/70 shadow-xs ring-1 ring-violet-500/20'
+                        : 'border-slate-200/60 bg-white/60 hover:bg-white'
                     }`}
                   >
                     <div className="min-w-0 space-y-0.5">
@@ -161,7 +161,7 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                         <span className="font-extrabold text-xs text-slate-900 truncate">
                           {lead.name}
                         </span>
-                        <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full ${badge.color}`}>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.color}`}>
                           {badge.text}
                         </span>
                       </div>
@@ -179,7 +179,7 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
 
           {/* Columna Derecha: Ficha de Seguimiento & Plantillas */}
           {selectedLead && (
-            <div className="lg:col-span-7 bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-4 sm:p-6 space-y-4 sm:space-y-5">
+            <div className="lg:col-span-7 bg-white/85 backdrop-blur-sm rounded-2xl border border-slate-200/70 shadow-xs p-4 sm:p-6 space-y-4 sm:space-y-5">
               
               {/* Encabezado del Prospecto Seleccionado */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-slate-100">
@@ -187,7 +187,7 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                   <span className="text-[10px] font-bold text-violet-600 uppercase tracking-wider">
                     Ficha de Prospecto
                   </span>
-                  <h3 className="text-lg font-black text-slate-900">
+                  <h3 className="text-base sm:text-lg font-black text-slate-900">
                     {selectedLead.name}
                   </h3>
                   <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
@@ -199,7 +199,7 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                       rel="noopener noreferrer"
                       className="font-mono text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
                     >
-                      <Phone className="w-3 h-3" />
+                      <Phone className="w-3.5 h-3.5" />
                       +{selectedLead.phone}
                     </a>
                   </div>
@@ -209,7 +209,7 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                   href={`https://wa.me/${selectedLead.phone}`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="py-2 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all active:scale-95 shrink-0 self-start sm:self-auto"
+                  className="w-full sm:w-auto h-11 sm:h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 shrink-0"
                 >
                   <MessageCircle className="w-4 h-4" />
                   <span>Abrir Chat WhatsApp</span>
@@ -217,9 +217,9 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                 </a>
               </div>
 
-              {/* Plantillas de Seguimiento Rápido */}
+              {/* Plantillas de Seguimiento Rápido (Sin Box-in-Box) */}
               <div className="space-y-3">
-                <h4 className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                <h4 className="text-xs font-extrabold text-slate-800 flex items-center gap-1.5">
                   <Sparkles className="w-3.5 h-3.5 text-violet-600" />
                   <span>Plantillas de Reactivación Comercial:</span>
                 </h4>
@@ -232,24 +232,24 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                     const waLink = `https://wa.me/${selectedLead.phone}?text=${encodeURIComponent(readyText)}`;
 
                     return (
-                      <div key={i} className="p-3.5 bg-slate-50 rounded-2xl border border-slate-200/80 space-y-2">
+                      <div key={i} className="p-3.5 bg-slate-50/70 rounded-2xl border border-slate-200/60 space-y-2">
                         <div className="flex items-center justify-between">
-                          <span className="font-bold text-xs text-slate-900">
+                          <span className="font-extrabold text-xs text-slate-900">
                             {tpl.title}
                           </span>
-                          <span className="text-[10px] text-slate-400">
+                          <span className="text-[10px] text-slate-400 font-medium">
                             {tpl.description}
                           </span>
                         </div>
-                        <p className="text-[11px] text-slate-600 leading-relaxed italic bg-white p-2 rounded-xl border border-slate-200/60">
+                        <p className="text-[11px] text-slate-600 leading-relaxed italic border-l-2 border-violet-400/80 pl-2.5 py-0.5">
                           "{readyText}"
                         </p>
-                        <div className="flex justify-end">
+                        <div className="flex justify-end pt-1">
                           <a
                             href={waLink}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="py-1 px-3 rounded-lg bg-slate-900 hover:bg-slate-800 text-white font-bold text-[11px] flex items-center gap-1 shadow-sm transition-all"
+                            className="h-9 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs transition-all active:scale-95"
                           >
                             <Send className="w-3 h-3 text-emerald-400" />
                             <span>Enviar por WhatsApp</span>
@@ -262,32 +262,32 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
               </div>
 
               {/* Bitácora de Notas Rápidas */}
-              <div className="space-y-2 pt-2 border-t border-slate-100">
+              <div className="space-y-2 pt-3 border-t border-slate-100">
                 <label className="text-xs font-bold text-slate-700 block">
                   Anotar seguimiento / próximo paso:
                 </label>
-                <div className="flex items-center gap-2">
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
                   <input
                     type="text"
                     value={currentNote}
                     onChange={(e) => setCurrentNote(e.target.value)}
                     placeholder="Ej: Llamar mañana a las 3 PM para confirmar propuesta..."
-                    className="flex-1 px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-violet-600"
+                    className="flex-1 px-3.5 py-2.5 rounded-xl bg-slate-50 border border-slate-200/90 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600"
                   />
                   <button
                     type="button"
                     onClick={handleSaveNoteSubmit}
                     disabled={isSaving || !currentNote.trim()}
-                    className="px-4 py-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs transition-all active:scale-95 disabled:opacity-40"
+                    className="h-10 px-5 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs transition-all active:scale-95 disabled:opacity-40 shrink-0"
                   >
-                    Guardar
+                    Guardar Nota
                   </button>
                 </div>
 
                 {selectedLead.notes && (
-                  <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-xl text-xs text-amber-950 mt-2">
-                    <span className="font-bold block mb-0.5">Última nota guardada:</span>
-                    <p className="text-[11px] leading-relaxed">
+                  <div className="p-3 bg-amber-50/70 border border-amber-200/80 rounded-xl text-xs text-amber-950 mt-2">
+                    <span className="font-bold block mb-0.5 text-[11px]">Última nota guardada:</span>
+                    <p className="text-[11px] leading-relaxed text-amber-900/90">
                       {selectedLead.notes}
                     </p>
                   </div>

@@ -89,14 +89,6 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [isSavingName, setIsSavingName] = useState<boolean>(false);
   const columnsContainerRef = React.useRef<HTMLDivElement>(null);
 
-  const scrollToStage = (status: LeadStatus, index: number) => {
-    setActiveStageIndex(index);
-    const colEl = document.getElementById(`kanban-col-${status}`);
-    if (colEl && columnsContainerRef.current) {
-      colEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
-    }
-  };
-
   // Filtrar leads por búsqueda interna del Kanban
   const filteredLeads = useMemo(() => {
     if (!searchFilter.trim()) return leads;
@@ -237,23 +229,215 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     setEditNameValue('');
   };
 
+  // Renderizado limpio de tarjeta individual sin Box-in-Box
+  const renderKanbanCard = (lead: Lead, isMobileList = false) => {
+    const hasPrev = getPrevStatus(lead.status) !== null;
+    const hasNext = getNextStatus(lead.status) !== null;
+
+    return (
+      <div
+        key={lead.id}
+        draggable={!isMobileList && editingLeadId !== lead.id}
+        onDragStart={(e) => !isMobileList && handleDragStart(e, lead.id)}
+        className="bg-white rounded-2xl p-4 border border-slate-200/70 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-md hover:border-slate-300 transition-all space-y-3 group cursor-pointer"
+        onClick={() => onOpenLeadProfile(lead)}
+      >
+        {/* Encabezado: Nombre, Edición y Monto */}
+        <div className="flex items-start justify-between gap-2" onClick={(e) => e.stopPropagation()}>
+          <div className="min-w-0 flex-1">
+            {editingLeadId === lead.id ? (
+              <div className="flex items-center gap-1.5 my-0.5">
+                <input
+                  type="text"
+                  value={editNameValue}
+                  onChange={(e) => setEditNameValue(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      handleSaveName(lead.id);
+                    } else if (e.key === 'Escape') {
+                      e.preventDefault();
+                      handleCancelEditName();
+                    }
+                  }}
+                  autoFocus
+                  disabled={isSavingName}
+                  placeholder="Nombre o negocio..."
+                  className="w-full text-xs font-bold text-slate-900 bg-slate-50 border border-slate-300 rounded-lg px-2.5 py-1 focus:outline-none focus:ring-2 focus:ring-violet-500 shadow-inner"
+                />
+                <button
+                  type="button"
+                  onClick={() => handleSaveName(lead.id)}
+                  disabled={isSavingName || !editNameValue.trim()}
+                  className="p-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-all shrink-0 active:scale-95"
+                  title="Guardar nombre"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={handleCancelEditName}
+                  disabled={isSavingName}
+                  className="p-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 transition-all shrink-0 active:scale-95"
+                  title="Cancelar edición"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-1.5">
+                <span className="text-sm font-extrabold text-slate-900 group-hover:text-violet-600 transition-colors truncate">
+                  {lead.name}
+                </span>
+                {onUpdateName && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleStartEditName(lead);
+                    }}
+                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors shrink-0"
+                    title="Modificar nombre rápido"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            )}
+
+            {/* Enlace directo a WhatsApp sin contenedor pesado */}
+            <div className="mt-1">
+              <a
+                href={`https://wa.me/${lead.phone}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="text-xs font-mono font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1.5 transition-colors py-0.5 active:scale-95"
+                title="Abrir chat en WhatsApp"
+              >
+                <Phone className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <span>+{lead.phone}</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Monto del Proyecto */}
+          <div className="text-right shrink-0">
+            <span className="font-mono text-sm font-black text-slate-900 bg-slate-100/80 px-2 py-0.5 rounded-lg border border-slate-200/60">
+              ${Number(lead.amount || 0).toFixed(0)}
+            </span>
+            <span className="block text-[10px] text-slate-400 font-sans mt-0.5">USD</span>
+          </div>
+        </div>
+
+        {/* Servicio Cotizado y Notas con Jerarquía Tipográfica (Cero Box-in-Box) */}
+        <div className="space-y-1">
+          <p className="text-xs font-semibold text-slate-700 leading-tight">
+            {lead.service}
+          </p>
+          {lead.notes && (
+            <p className="text-[11px] text-slate-500 italic line-clamp-2 border-l-2 border-violet-400/80 pl-2 mt-1">
+              "{lead.notes}"
+            </p>
+          )}
+        </div>
+
+        {/* Controles de Avance Ergonómicos con Touch Targets Amplios */}
+        <div
+          className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1.5"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <button
+            type="button"
+            onClick={() => handleStepMove(lead, 'back')}
+            disabled={!hasPrev}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed border border-slate-200/60 text-slate-700 transition-all active:scale-95 shrink-0 touch-manipulation"
+            title="Retroceder etapa"
+            aria-label="Retroceder etapa"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+
+          {lead.status === 'cotizado' ? (
+            <button
+              type="button"
+              onClick={() => {
+                const hasExistingPurchase = lead.metaEvents?.some((ev) => ev.eventName === 'Purchase');
+                if (!hasExistingPurchase) {
+                  onOpenSaleModal(lead, 'anticipo');
+                } else {
+                  onUpdateStatus(lead.id, 'anticipo');
+                }
+              }}
+              className="flex-1 h-10 px-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation"
+              title="Registrar cobro de anticipo y despachar Purchase a Meta"
+            >
+              <DollarSign className="w-3.5 h-3.5" />
+              <span>Pagó Anticipo ➔</span>
+            </button>
+          ) : lead.status === 'anticipo' ? (
+            <button
+              type="button"
+              onClick={() => {
+                const hasExistingPurchase = lead.metaEvents?.some((ev) => ev.eventName === 'Purchase');
+                if (!hasExistingPurchase) {
+                  onOpenSaleModal(lead, 'cerrado');
+                } else {
+                  onUpdateStatus(lead.id, 'cerrado');
+                }
+              }}
+              className="flex-1 h-10 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation"
+              title="Marcar proyecto como entregado y cerrado"
+            >
+              <CheckCircle2 className="w-4 h-4" />
+              <span>Entregar Proyecto ➔</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => onOpenLeadProfile(lead)}
+              className="flex-1 h-10 px-2 rounded-xl text-xs text-slate-600 hover:text-violet-700 hover:bg-slate-100 font-bold transition-all text-center flex items-center justify-center"
+            >
+              Ver Ficha Detallada
+            </button>
+          )}
+
+          <button
+            type="button"
+            onClick={() => handleStepMove(lead, 'forward')}
+            disabled={!hasNext}
+            className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed border border-slate-200/60 text-slate-700 transition-all active:scale-95 shrink-0 touch-manipulation"
+            title="Avanzar etapa"
+            aria-label="Avanzar etapa"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  const activeMobileColumn = COLUMNS[activeStageIndex] || COLUMNS[0];
+  const activeMobileLeads = filteredLeads.filter((l) => l.status === activeMobileColumn.status);
+  const activeMobileTotal = activeMobileLeads.reduce((acc, curr) => acc + (curr.amount || 0), 0);
+
   return (
     <div className="space-y-4 w-full">
-      {/* Barra de Control y Filtros del Kanban (Boxing Box Superior) */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white p-4 rounded-2xl border border-slate-200/90 shadow-2xs">
+      {/* Barra de Control y Filtros del Kanban (Diseño Abierto y Sin Box-in-Box) */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white/80 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-slate-200/70 shadow-xs">
         
         {/* Título & Métricas Rápidas */}
         <div className="flex flex-wrap items-center gap-3">
           <div>
             <div className="flex items-center gap-2">
-              <h2 className="text-base font-black text-slate-900 tracking-tight">
+              <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
                 Tablero Visual de Ventas (Pipeline Kanban)
               </h2>
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-200">
+              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-200/80">
                 {leads.length} clientes
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-0.5">
+            <p className="text-xs text-slate-500 mt-0.5 hidden sm:block">
               Arrastra las tarjetas libremente o pulsa las flechas para avanzar etapas comerciales.
             </p>
           </div>
@@ -283,7 +467,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
               placeholder="Buscar cliente o teléfono..."
-              className="w-full pl-9 pr-3 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-500 transition-all"
+              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
             />
             {searchFilter && (
               <button
@@ -296,7 +480,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             )}
           </div>
 
-          {/* Toggle de pantalla ancha / Colapsar barra lateral en escritorio */}
+          {/* Toggle de pantalla ancha en escritorio */}
           {onToggleSidebarCollapse && (
             <button
               type="button"
@@ -325,47 +509,96 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all shadow-sm active:scale-95 shrink-0"
           >
             <PlusCircle className="w-4 h-4 text-violet-400" />
-            <span>Nuevo Contacto</span>
+            <span className="hidden sm:inline">Nuevo Contacto</span>
+            <span className="sm:hidden font-bold">Nuevo</span>
           </button>
         </div>
 
       </div>
 
-      {/* Selector de Etapa Rápido en Móvil (Píldoras con Scroll Horizontal Suave) */}
-      <div className="sm:hidden flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 px-0.5">
-        {COLUMNS.map((col, idx) => {
-          const colLeads = filteredLeads.filter((l) => l.status === col.status);
-          const isSelected = activeStageIndex === idx;
+      {/* ─── VISTA MÓVIL: SELECTOR ERGONÓMICO DE ETAPAS & LISTA FLUIDA (sm:hidden) ─── */}
+      <div className="sm:hidden space-y-3">
+        {/* Píldoras de Navegación entre las 4 Etapas */}
+        <div className="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-1 px-0.5">
+          {COLUMNS.map((col, idx) => {
+            const colLeads = filteredLeads.filter((l) => l.status === col.status);
+            const isSelected = activeStageIndex === idx;
 
-          return (
-            <button
-              key={col.status}
-              type="button"
-              onClick={() => scrollToStage(col.status, idx)}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border active:scale-95 touch-manipulation ${
-                isSelected
-                  ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900/20'
-                  : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50 shadow-2xs'
-              }`}
-            >
-              <span className={`w-2 h-2 rounded-full shrink-0 ${col.dotColor}`} />
-              <span>{col.title}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-mono font-bold ${
-                isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
-              }`}>
-                {colLeads.length}
-              </span>
-            </button>
-          );
-        })}
+            return (
+              <button
+                key={col.status}
+                type="button"
+                onClick={() => setActiveStageIndex(idx)}
+                className={`px-3 py-2 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 shrink-0 border active:scale-95 touch-manipulation min-h-[42px] ${
+                  isSelected
+                    ? 'bg-slate-900 text-white border-slate-900 shadow-md ring-2 ring-slate-900/10'
+                    : 'bg-white text-slate-700 border-slate-200/80 hover:bg-slate-50 shadow-xs'
+                }`}
+              >
+                <span className={`w-2 h-2 rounded-full shrink-0 ${col.dotColor}`} />
+                <span>{col.title}</span>
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-mono font-bold leading-none ${
+                  isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-700'
+                }`}>
+                  {colLeads.length}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Banner Informativo de la Etapa Activa en Móvil */}
+        <div className="bg-white/80 backdrop-blur-md rounded-2xl p-3 border border-slate-200/70 flex items-center justify-between shadow-xs">
+          <div className="flex items-center gap-2 min-w-0">
+            <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${activeMobileColumn.dotColor}`} />
+            <div>
+              <h3 className="font-extrabold text-xs text-slate-900 truncate">
+                {activeMobileColumn.title}
+              </h3>
+              <p className="text-[11px] text-slate-500 truncate">
+                {activeMobileColumn.description}
+              </p>
+            </div>
+          </div>
+          <div className="text-right shrink-0 pl-2">
+            <span className="font-mono font-bold text-xs text-slate-900 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+              ${activeMobileTotal.toFixed(0)} USD
+            </span>
+            <span className="block text-[10px] text-slate-400 mt-0.5">
+              {activeMobileLeads.length} {activeMobileLeads.length === 1 ? 'cliente' : 'clientes'}
+            </span>
+          </div>
+        </div>
+
+        {/* Lista Vertical Fluida de Tarjetas para Móvil (Cero Scroll Trapping) */}
+        <div className="space-y-3 pb-8">
+          {activeMobileLeads.length === 0 ? (
+            <div className="py-12 px-4 text-center border border-dashed border-slate-200 rounded-2xl bg-white/60 space-y-2">
+              <p className="text-xs font-semibold text-slate-600">No hay clientes en {activeMobileColumn.title}</p>
+              <p className="text-[11px] text-slate-400">
+                Selecciona otra etapa arriba o registra un nuevo prospecto.
+              </p>
+              <button
+                type="button"
+                onClick={onAddNewLead}
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-violet-50 text-violet-700 border border-violet-200 font-bold text-xs active:scale-95"
+              >
+                <PlusCircle className="w-3.5 h-3.5" />
+                <span>Crear Nuevo Lead</span>
+              </button>
+            </div>
+          ) : (
+            activeMobileLeads.map((lead) => renderKanbanCard(lead, true))
+          )}
+        </div>
       </div>
 
-      {/* Workspace de 5 Columnas — Amplitud Total con Scroll Snap en Móvil */}
+      {/* ─── VISTA ESCRITORIO: TABLERO KANBAN DE 4 COLUMNAS FLUIDAS (hidden sm:flex) ─── */}
       <div 
         ref={columnsContainerRef}
-        className="flex gap-3 sm:gap-4 items-stretch w-full overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-slate-300"
+        className="hidden sm:flex gap-3 sm:gap-4 items-stretch w-full overflow-x-auto pb-4 pt-1 snap-x snap-mandatory scroll-smooth scrollbar-thin scrollbar-thumb-slate-300"
       >
-        {COLUMNS.map((col, colIdx) => {
+        {COLUMNS.map((col) => {
           const colLeads = filteredLeads.filter((l) => l.status === col.status);
           const colTotal = colLeads.reduce((acc, curr) => acc + (curr.amount || 0), 0);
           const isDropTarget = activeDropCol === col.status;
@@ -377,14 +610,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               onDragOver={(e) => handleDragOver(e, col.status)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, col.status)}
-              className={`rounded-2xl border bg-slate-100/90 p-3 sm:p-3.5 flex flex-col w-[86vw] max-w-[360px] shrink-0 snap-center sm:w-auto sm:flex-1 sm:min-w-[300px] xl:min-w-[280px] 2xl:min-w-0 transition-all h-[calc(100dvh-280px)] sm:h-[calc(100vh-215px)] min-h-[480px] sm:min-h-[560px] ${
+              className={`rounded-2xl border bg-slate-100/60 p-3 sm:p-3.5 flex flex-col sm:flex-1 sm:min-w-[280px] xl:min-w-[270px] 2xl:min-w-0 transition-all h-[calc(100vh-215px)] min-h-[560px] ${
                 isDropTarget
                   ? 'border-violet-500 bg-violet-50/70 ring-2 ring-violet-500/20 shadow-md'
-                  : 'border-slate-200/90 shadow-2xs'
+                  : 'border-slate-200/70 shadow-xs'
               }`}
             >
               {/* Encabezado Fijo de Columna */}
-              <div className="pb-3 mb-2 border-b border-slate-200/80 shrink-0">
+              <div className="pb-3 mb-2 border-b border-slate-200/70 shrink-0">
                 <div className="flex items-center justify-between mb-1.5">
                   <div className="flex items-center gap-2 min-w-0">
                     <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${col.dotColor}`} />
@@ -393,10 +626,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     </h3>
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="sm:hidden text-[10px] font-semibold text-slate-400">
-                      {colIdx + 1}/4
-                    </span>
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200 shadow-2xs">
+                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200/70 shadow-2xs">
                       {colLeads.length}
                     </span>
                   </div>
@@ -412,205 +642,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 </div>
               </div>
 
-              {/* Área de Tarjetas con Scroll Vertical Independiente */}
+              {/* Área de Tarjetas con Scroll Vertical */}
               <div className="space-y-2.5 flex-1 overflow-y-auto pr-1 mt-1 -mr-1">
                 {colLeads.length === 0 ? (
-                  <div className="h-36 flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-300 rounded-2xl text-slate-400 bg-white/50">
+                  <div className="h-36 flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-200 rounded-2xl text-slate-400 bg-white/40">
                     <p className="text-xs font-semibold text-slate-600">Sin clientes en esta fase</p>
                     <p className="text-[11px] text-slate-400 mt-1">Arrastra una tarjeta o usa las flechas</p>
                   </div>
                 ) : (
-                  colLeads.map((lead) => {
-                    const hasPrev = getPrevStatus(lead.status) !== null;
-                    const hasNext = getNextStatus(lead.status) !== null;
-
-                    return (
-                      <div
-                        key={lead.id}
-                        draggable={editingLeadId !== lead.id}
-                        onDragStart={(e) => handleDragStart(e, lead.id)}
-                        className="bg-white rounded-xl p-3.5 border border-slate-200/90 shadow-2xs hover:shadow-md hover:border-slate-300 transition-all cursor-grab active:cursor-grabbing space-y-2.5 group"
-                      >
-                        {/* Nombre del Cliente y Monto */}
-                        <div className="flex items-start justify-between gap-2">
-                          <div className="min-w-0 flex-1">
-                            {editingLeadId === lead.id ? (
-                              <div
-                                className="flex items-center gap-1.5 my-0.5"
-                                onClick={(e) => e.stopPropagation()}
-                                onMouseDown={(e) => e.stopPropagation()}
-                              >
-                                <input
-                                  type="text"
-                                  value={editNameValue}
-                                  onChange={(e) => setEditNameValue(e.target.value)}
-                                  onKeyDown={(e) => {
-                                    if (e.key === 'Enter') {
-                                      e.preventDefault();
-                                      handleSaveName(lead.id);
-                                    } else if (e.key === 'Escape') {
-                                      e.preventDefault();
-                                      handleCancelEditName();
-                                    }
-                                  }}
-                                  autoFocus
-                                  disabled={isSavingName}
-                                  placeholder="Nombre o negocio..."
-                                  className="w-full text-xs font-bold text-slate-900 bg-slate-50 border border-slate-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-1.5 focus:ring-violet-500 focus:border-violet-500 shadow-inner"
-                                />
-                                <button
-                                  type="button"
-                                  onClick={() => handleSaveName(lead.id)}
-                                  disabled={isSavingName || !editNameValue.trim()}
-                                  className="p-1 rounded-lg bg-emerald-600 hover:bg-emerald-700 disabled:opacity-40 text-white transition-all shrink-0 active:scale-95 touch-manipulation"
-                                  title="Guardar nombre"
-                                >
-                                  <Check className="w-3.5 h-3.5" />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={handleCancelEditName}
-                                  disabled={isSavingName}
-                                  className="p-1 rounded-lg bg-slate-200 hover:bg-slate-300 text-slate-700 transition-all shrink-0 active:scale-95 touch-manipulation"
-                                  title="Cancelar edición"
-                                >
-                                  <X className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            ) : (
-                              <div className="flex items-center gap-1.5 group/title">
-                                <button
-                                  type="button"
-                                  onClick={() => onOpenLeadProfile(lead)}
-                                  className="text-left text-xs font-extrabold text-slate-900 hover:text-indigo-600 truncate transition-colors cursor-pointer"
-                                  title="Clic para abrir perfil y editar cliente"
-                                >
-                                  {lead.name}
-                                </button>
-                                {onUpdateName && (
-                                  <button
-                                    type="button"
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      handleStartEditName(lead);
-                                    }}
-                                    className="p-0.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors shrink-0 touch-manipulation"
-                                    title="Modificar nombre rápido"
-                                  >
-                                    <Pencil className="w-3 h-3" />
-                                  </button>
-                                )}
-                              </div>
-                            )}
-
-                            <a
-                              href={`https://wa.me/${lead.phone}`}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="text-[11px] text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200/70 font-mono inline-flex items-center gap-1 transition-colors mt-1 font-semibold"
-                              title="Abrir chat en WhatsApp"
-                            >
-                              <Phone className="w-3 h-3 text-emerald-600 shrink-0" />
-                              <span>+{lead.phone}</span>
-                            </a>
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => onOpenLeadProfile(lead)}
-                            className="font-mono text-xs font-black text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200 shrink-0 transition-colors"
-                            title="Ver y editar presupuesto"
-                          >
-                            ${Number(lead.amount || 0).toFixed(0)}
-                          </button>
-                        </div>
-
-                        {/* Servicio Cotizado / Notas (Clickeable al perfil) */}
-                        <div 
-                          onClick={() => onOpenLeadProfile(lead)}
-                          className="text-[11px] space-y-1 cursor-pointer group/details"
-                          title="Clic para ver especificaciones y editar perfil"
-                        >
-                          <div className="font-semibold text-slate-700 bg-slate-50 group-hover/details:bg-indigo-50/60 group-hover/details:text-indigo-900 px-2.5 py-1 rounded-lg border border-slate-200/80 group-hover/details:border-indigo-200 truncate transition-all">
-                            {lead.service}
-                          </div>
-                          {lead.notes && (
-                            <p className="text-slate-600 text-[10px] line-clamp-2 italic bg-slate-50/70 group-hover/details:bg-indigo-50/40 p-2 rounded-lg border border-slate-100 transition-all">
-                              "{lead.notes}"
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Controles de Avance Ergonómicos (Touch Targets Amplios) */}
-                        <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => handleStepMove(lead, 'back')}
-                            disabled={!hasPrev}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-25 disabled:cursor-not-allowed border border-slate-200/80 text-slate-700 transition-all active:scale-95 touch-manipulation shrink-0"
-                            title="Retroceder etapa"
-                          >
-                            <ChevronLeft className="w-4 h-4" />
-                          </button>
-
-                          {lead.status === 'cotizado' ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const hasExistingPurchase = lead.metaEvents?.some((ev) => ev.eventName === 'Purchase');
-                                if (!hasExistingPurchase) {
-                                  onOpenSaleModal(lead, 'anticipo');
-                                } else {
-                                  onUpdateStatus(lead.id, 'anticipo');
-                                }
-                              }}
-                              className="flex-1 h-9 px-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation"
-                              title="Registrar cobro de anticipo y despachar Purchase a Meta"
-                            >
-                              <DollarSign className="w-3.5 h-3.5" />
-                              <span>Pagó Anticipo ➔</span>
-                            </button>
-                          ) : lead.status === 'anticipo' ? (
-                            <button
-                              type="button"
-                              onClick={() => {
-                                const hasExistingPurchase = lead.metaEvents?.some((ev) => ev.eventName === 'Purchase');
-                                if (!hasExistingPurchase) {
-                                  onOpenSaleModal(lead, 'cerrado');
-                                } else {
-                                  onUpdateStatus(lead.id, 'cerrado');
-                                }
-                              }}
-                              className="flex-1 h-9 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation"
-                              title="Marcar proyecto como entregado y cerrado"
-                            >
-                              <CheckCircle2 className="w-4 h-4" />
-                              <span>Entregar Proyecto ➔</span>
-                            </button>
-                          ) : (
-                            <button
-                              type="button"
-                              onClick={() => onOpenLeadProfile(lead)}
-                              className="text-[10px] text-slate-500 hover:text-indigo-600 font-semibold truncate text-center flex-1 transition-colors"
-                            >
-                              Ver Perfil
-                            </button>
-                          )}
-
-                          <button
-                            type="button"
-                            onClick={() => handleStepMove(lead, 'forward')}
-                            disabled={!hasNext}
-                            className="w-9 h-9 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-25 disabled:cursor-not-allowed border border-slate-200/80 text-slate-700 transition-all active:scale-95 touch-manipulation shrink-0"
-                            title="Avanzar etapa"
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </button>
-                        </div>
-
-                      </div>
-                    );
-                  })
+                  colLeads.map((lead) => renderKanbanCard(lead, false))
                 )}
               </div>
             </div>

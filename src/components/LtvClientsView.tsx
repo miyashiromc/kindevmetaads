@@ -82,7 +82,7 @@ export const LtvClientsView: React.FC<LtvClientsViewProps> = ({ leads }) => {
       {/* Tarjetas de Resumen LTV */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-4">
         
-        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
+        <div className="bg-white/85 backdrop-blur-sm p-4 sm:p-5 rounded-2xl border border-slate-200/70 shadow-xs flex items-center justify-between">
           <div className="space-y-0.5 sm:space-y-1">
             <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">
               Clientes en Cartera
@@ -90,33 +90,33 @@ export const LtvClientsView: React.FC<LtvClientsViewProps> = ({ leads }) => {
             <div className="text-xl sm:text-2xl font-black text-slate-900 font-mono">
               {closedLeads.length} Clientes
             </div>
-            <p className="text-[10px] sm:text-[11px] text-slate-500 truncate">
+            <p className="text-[10px] sm:text-[11px] text-slate-400 truncate">
               Ventas: ${totalClosedRevenue.toFixed(0)} USD
             </p>
           </div>
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-200/80 flex items-center justify-center shrink-0">
-            <Gem className="w-5 h-5 sm:w-6 sm:h-6" />
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-200/60 flex items-center justify-center shrink-0">
+            <Gem className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
+        <div className="bg-white/85 backdrop-blur-sm p-4 sm:p-5 rounded-2xl border border-slate-200/70 shadow-xs flex items-center justify-between">
           <div className="space-y-0.5 sm:space-y-1">
             <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">
               Potencial Recompra Anual
             </span>
             <div className="text-xl sm:text-2xl font-black text-emerald-600 font-mono">
-              +${totalRecurringPotential.toFixed(0)} <span className="text-xs text-slate-400 font-sans">USD</span>
+              +${totalRecurringPotential.toFixed(0)} <span className="text-xs text-slate-400 font-sans font-medium">USD</span>
             </div>
-            <p className="text-[10px] sm:text-[11px] text-emerald-700 font-medium truncate">
+            <p className="text-[10px] sm:text-[11px] text-emerald-700 font-semibold truncate">
               Hostings + mant. recurrente
             </p>
           </div>
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-emerald-50 text-emerald-600 border border-emerald-200/80 flex items-center justify-center shrink-0">
-            <RefreshCw className="w-5 h-5 sm:w-6 sm:h-6" />
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center shrink-0">
+            <RefreshCw className="w-5 h-5" />
           </div>
         </div>
 
-        <div className="bg-white p-4 sm:p-5 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs flex items-center justify-between">
+        <div className="bg-white/85 backdrop-blur-sm p-4 sm:p-5 rounded-2xl border border-slate-200/70 shadow-xs flex items-center justify-between">
           <div className="space-y-0.5 sm:space-y-1">
             <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">
               Hostings Monitoreados
@@ -129,24 +129,24 @@ export const LtvClientsView: React.FC<LtvClientsViewProps> = ({ leads }) => {
               <span>Monitoreo 365 días</span>
             </p>
           </div>
-          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-violet-50 text-violet-600 border border-violet-200/80 flex items-center justify-center shrink-0">
-            <Server className="w-5 h-5 sm:w-6 sm:h-6" />
+          <div className="w-10 h-10 sm:w-11 sm:h-11 rounded-xl bg-violet-50 text-violet-600 border border-violet-200/60 flex items-center justify-center shrink-0">
+            <Server className="w-5 h-5" />
           </div>
         </div>
 
       </div>
 
-      {/* Listado de Clientes con Countdown y Oportunidad de Recompra */}
-      <div className="bg-white rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs p-4 sm:p-6 space-y-4">
+      {/* Listado de Clientes con Countdown y Oportunidad de Recompra (Sin Box-in-Box) */}
+      <div className="bg-white/85 backdrop-blur-sm rounded-2xl border border-slate-200/70 shadow-xs p-4 sm:p-6 space-y-4">
         <div>
           <h3 className="text-sm sm:text-base font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
             <span>Base de Clientes & Valor LTV</span>
-            <span className="text-[10px] sm:text-xs font-semibold px-2.5 py-0.5 rounded-full bg-indigo-100 text-indigo-800">
+            <span className="text-[10px] sm:text-xs font-bold px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 border border-indigo-200/70">
               {closedLeads.length} entregados
             </span>
           </h3>
           <p className="text-xs text-slate-500 mt-0.5">
-            Vigencia de infraestructura y sugerencias inteligentes de segundas fases comerciales.
+            Vigencia de infraestructura y sugerencias de segundas fases comerciales.
           </p>
         </div>
 
@@ -166,56 +166,56 @@ export const LtvClientsView: React.FC<LtvClientsViewProps> = ({ leads }) => {
               return (
                 <div
                   key={lead.id}
-                  className="bg-slate-50 rounded-2xl p-4 border border-slate-200/90 shadow-2xs hover:shadow-md transition-all space-y-3"
+                  className="bg-white rounded-2xl p-4 sm:p-5 border border-slate-200/70 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-md transition-all space-y-3"
                 >
                   {/* Nombre y Facturación Inicial */}
                   <div className="flex items-start justify-between gap-2">
                     <div className="min-w-0">
-                      <h4 className="text-xs sm:text-sm font-extrabold text-slate-900 truncate">
+                      <h4 className="text-sm font-extrabold text-slate-900 truncate">
                         {lead.name}
                       </h4>
-                      <p className="text-[11px] text-slate-500 font-semibold truncate">
+                      <p className="text-xs text-slate-500 font-medium truncate">
                         {lead.service}
                       </p>
                     </div>
 
                     <div className="text-right shrink-0">
-                      <span className="font-mono font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-xl border border-emerald-200 text-xs">
-                        ${lead.amount.toFixed(0)} <span className="text-[10px] font-sans">USD</span>
+                      <span className="font-mono font-black text-slate-900 bg-slate-100 px-2 py-0.5 rounded-lg border border-slate-200/60 text-xs">
+                        ${lead.amount.toFixed(0)} <span className="text-[10px] font-sans font-medium text-slate-400">USD</span>
                       </span>
                     </div>
                   </div>
 
-                  {/* Estado de Hosting y Dominio */}
-                  <div className="bg-white rounded-xl p-2.5 sm:p-3 border border-slate-200/70 flex items-center justify-between text-xs">
-                    <div className="flex items-center gap-2">
+                  {/* Estado de Hosting y Dominio en Fila Limpia */}
+                  <div className="flex items-center justify-between text-xs py-1 border-t border-b border-slate-100">
+                    <div className="flex items-center gap-1.5 text-slate-500">
                       <Server className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-                      <span className="text-slate-600 font-medium text-[11px]">Hosting:</span>
+                      <span className="font-medium text-[11px]">Hosting & Dominio:</span>
                     </div>
-                    <span className={`px-2 py-0.5 rounded-full font-bold text-[10px] sm:text-[11px] ${hosting.color}`}>
+                    <span className={`px-2.5 py-0.5 rounded-full font-bold text-[10px] sm:text-[11px] ${hosting.color}`}>
                       {hosting.text}
                     </span>
                   </div>
 
-                  {/* Oportunidad de Recompra Recomendada */}
-                  <div className="bg-indigo-50/70 rounded-xl p-3 border border-indigo-100 space-y-1.5 text-xs text-indigo-950">
-                    <div className="flex items-center justify-between">
-                      <span className="font-bold flex items-center gap-1 text-indigo-900 text-[11px]">
+                  {/* Oportunidad de Recompra (Con acento lateral, sin caja pesada) */}
+                  <div className="border-l-2 border-indigo-500 pl-3 py-1 space-y-1">
+                    <div className="flex items-center justify-between text-xs">
+                      <span className="font-extrabold flex items-center gap-1 text-indigo-950 text-[11px]">
                         <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                        Recompra:
+                        Recompra Sugerida:
                       </span>
                       <span className="font-mono font-black text-indigo-700 text-xs">
                         +${upsell.potentialUsd} USD
                       </span>
                     </div>
-                    <p className="text-[11px] text-indigo-900/80 leading-relaxed font-medium">
+                    <p className="text-[11px] text-slate-600 leading-relaxed font-medium">
                       {upsell.opportunity}
                     </p>
                   </div>
 
-                  {/* Botón de 1 Clic para WhatsApp (Full width en móvil para máxima ergonomía) */}
-                  <div className="pt-1 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                    <span className="font-mono text-[11px] text-slate-500 truncate">
+                  {/* Botón de 1 Clic para WhatsApp */}
+                  <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                    <span className="font-mono text-xs text-slate-400 truncate">
                       +{lead.phone}
                     </span>
 
@@ -223,11 +223,11 @@ export const LtvClientsView: React.FC<LtvClientsViewProps> = ({ leads }) => {
                       href={`https://wa.me/${lead.phone}?text=${personalizedMsg}`}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="w-full sm:w-auto py-2 px-3.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation shrink-0"
+                      className="w-full sm:w-auto h-11 sm:h-10 px-4 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation shrink-0"
                     >
-                      <MessageCircle className="w-3.5 h-3.5" />
+                      <MessageCircle className="w-4 h-4" />
                       <span>Contactar Recompra</span>
-                      <ArrowUpRight className="w-3 h-3 opacity-70" />
+                      <ArrowUpRight className="w-3.5 h-3.5 opacity-70" />
                     </a>
                   </div>
 

@@ -89,54 +89,59 @@ export const LeadProfileModal: React.FC<LeadProfileModalProps> = ({
   const hasPurchaseEvent = lead.metaEvents?.some(e => e.eventName === 'Purchase');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm p-4 overflow-y-auto animate-fade-in">
-      <div className="relative w-full max-w-2xl bg-white rounded-3xl shadow-2xl border border-slate-200 overflow-hidden my-6">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/75 backdrop-blur-sm sm:p-4 overflow-y-auto animate-fade-in">
+      <div className="relative w-full max-w-2xl bg-white rounded-t-3xl sm:rounded-3xl shadow-2xl border-t sm:border border-slate-200 overflow-hidden max-h-[92dvh] sm:max-h-[90vh] flex flex-col my-0 sm:my-6 pb-safe sm:pb-0">
         
         {/* Encabezado Principal */}
-        <div className="flex items-center justify-between px-6 py-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border-b border-indigo-900/40">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-indigo-300 shadow-inner">
-              <User className="w-6 h-6" />
-            </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="text-lg font-black text-white tracking-tight">{lead.name}</h2>
-                <span className="text-[11px] px-2 py-0.5 rounded-full font-mono bg-white/15 border border-white/20 text-indigo-200">
-                  ID: {lead.id.slice(-6)}
-                </span>
-              </div>
-              <p className="text-xs text-indigo-200/80 mt-0.5 flex items-center gap-2">
-                <span>Registrado: {new Date(lead.createdAt).toLocaleDateString('es-EC', { day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                <span>•</span>
-                <span className="capitalize">{lead.source === 'whatsapp_auto' ? 'Captura WhatsApp' : 'Manual'}</span>
-              </p>
-            </div>
-          </div>
+        <div className="px-5 sm:px-6 py-4 sm:py-5 bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 text-white border-b border-indigo-900/40 shrink-0">
+          {/* Indicador táctil en móvil */}
+          <div className="w-12 h-1 bg-white/20 rounded-full mx-auto -mt-1 mb-3 sm:hidden" />
 
-          <div className="flex items-center gap-1">
-            <a
-              href={`https://wa.me/${lead.phone}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="p-2.5 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-bold"
-              title="Abrir WhatsApp Web"
-            >
-              <Phone className="w-4 h-4 text-emerald-400" />
-              <span className="hidden sm:inline">WhatsApp</span>
-            </a>
-            <button
-              type="button"
-              onClick={onClose}
-              className="p-2 rounded-xl text-indigo-200 hover:text-white hover:bg-white/10 transition-all active:scale-95"
-              title="Cerrar ventana"
-            >
-              <X className="w-5 h-5" />
-            </button>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-2xl bg-white/10 border border-white/20 flex items-center justify-center text-indigo-300 shadow-inner shrink-0">
+                <User className="w-5 h-5 sm:w-6 sm:h-6" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <h2 className="text-base sm:text-lg font-black text-white tracking-tight truncate max-w-[160px] sm:max-w-xs">{lead.name}</h2>
+                  <span className="text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full font-mono bg-white/15 border border-white/20 text-indigo-200">
+                    ID: {lead.id.slice(-6)}
+                  </span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-indigo-200/80 mt-0.5 flex items-center gap-1.5 sm:gap-2">
+                  <span>{new Date(lead.createdAt).toLocaleDateString('es-EC', { day: 'numeric', month: 'short' })}</span>
+                  <span>•</span>
+                  <span className="capitalize">{lead.source === 'whatsapp_auto' ? 'Captura WhatsApp' : 'Manual'}</span>
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <a
+                href={`https://wa.me/${lead.phone}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="h-9 px-3 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/30 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-bold"
+                title="Abrir WhatsApp Web"
+              >
+                <Phone className="w-3.5 h-3.5 text-emerald-400" />
+                <span className="hidden sm:inline">WhatsApp</span>
+              </a>
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-9 h-9 rounded-xl text-indigo-200 hover:text-white hover:bg-white/10 flex items-center justify-center transition-all active:scale-95"
+                title="Cerrar ventana"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         </div>
 
         {/* Formulario / Contenido de Edición */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-6 max-h-[82vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-5 overflow-y-auto flex-1">
 
           {/* Estado de Embudo (4 Fases Claras) */}
           <div className="space-y-2">
@@ -336,7 +341,7 @@ export const LeadProfileModal: React.FC<LeadProfileModalProps> = ({
           </div>
 
           {/* Barra de Acciones Final */}
-          <div className="flex items-center justify-between pt-2 border-t border-slate-100 gap-2">
+          <div className="flex items-center justify-between pt-3 border-t border-slate-100 gap-2 shrink-0">
             {onDeleteLead ? (
               <button
                 type="button"
@@ -346,7 +351,7 @@ export const LeadProfileModal: React.FC<LeadProfileModalProps> = ({
                     onClose();
                   }
                 }}
-                className="px-3 py-2.5 rounded-xl border border-rose-200 hover:bg-rose-50 text-rose-600 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95"
+                className="h-11 px-3.5 rounded-xl border border-rose-200 hover:bg-rose-50 active:bg-rose-100 text-rose-600 font-bold text-xs flex items-center gap-1.5 transition-all active:scale-95"
               >
                 <Trash2 className="w-4 h-4" />
                 <span className="hidden sm:inline">Eliminar</span>
@@ -357,14 +362,14 @@ export const LeadProfileModal: React.FC<LeadProfileModalProps> = ({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2.5 rounded-xl border border-slate-200 hover:bg-slate-100 text-slate-700 font-bold text-xs transition-all active:scale-95"
+                className="h-11 px-4 rounded-xl border border-slate-200 hover:bg-slate-100 active:bg-slate-200 text-slate-700 font-bold text-xs transition-all active:scale-95"
               >
                 Cancelar
               </button>
               <button
                 type="submit"
                 disabled={isSaving}
-                className="px-5 py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 disabled:opacity-50"
+                className="h-11 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 active:bg-slate-950 text-white font-bold text-xs flex items-center gap-2 shadow-md transition-all active:scale-95 disabled:opacity-50"
               >
                 <Save className="w-4 h-4 text-indigo-400" />
                 <span>{isSaving ? 'Guardando...' : 'Guardar Cambios'}</span>

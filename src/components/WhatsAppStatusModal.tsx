@@ -55,36 +55,41 @@ export const WhatsAppStatusModal: React.FC<WhatsAppStatusModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-fade-in">
-      <div className="bg-white rounded-3xl max-w-lg w-full shadow-2xl border border-slate-200 overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center sm:p-4 bg-slate-950/75 backdrop-blur-sm animate-fade-in">
+      <div className="bg-white rounded-t-3xl sm:rounded-3xl max-w-lg w-full shadow-2xl border-t sm:border border-slate-200 overflow-hidden max-h-[92dvh] sm:max-h-[90vh] flex flex-col">
         
         {/* Modal Header */}
-        <div className="p-5 border-b border-slate-100 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
-              isConnected ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'
-            }`}>
-              <MessageSquare className="w-5 h-5" />
+        <div className="p-4 sm:p-5 border-b border-slate-100 shrink-0">
+          {/* Indicador táctil en móvil */}
+          <div className="w-12 h-1 bg-slate-200 rounded-full mx-auto -mt-1 mb-2.5 sm:hidden" />
+
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-10 h-10 rounded-2xl flex items-center justify-center ${
+                isConnected ? 'bg-emerald-100 text-emerald-600' : 'bg-rose-100 text-rose-600'
+              }`}>
+                <MessageSquare className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-base font-extrabold text-slate-900">
+                  Escuchador de WhatsApp
+                </h3>
+                <p className="text-xs text-slate-500 font-medium">
+                  Pasarela Automática de Leads & Meta CAPI
+                </p>
+              </div>
             </div>
-            <div>
-              <h3 className="text-base font-extrabold text-slate-900">
-                Escuchador de WhatsApp
-              </h3>
-              <p className="text-xs text-slate-500 font-medium">
-                Pasarela Automática de Leads & Meta CAPI
-              </p>
-            </div>
+            <button
+              onClick={onClose}
+              className="w-9 h-9 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-all active:scale-95"
+            >
+              <X className="w-4 h-4" />
+            </button>
           </div>
-          <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-500 flex items-center justify-center transition-all"
-          >
-            <X className="w-4 h-4" />
-          </button>
         </div>
 
         {/* Modal Body */}
-        <div className="p-6 space-y-5">
+        <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 overflow-y-auto flex-1">
           
           {/* Card de Estado Principal */}
           <div className={`p-4 rounded-2xl border flex items-start gap-3.5 transition-all ${
@@ -200,11 +205,11 @@ export const WhatsAppStatusModal: React.FC<WhatsAppStatusModalProps> = ({
         </div>
 
         {/* Footer Modal */}
-        <div className="p-4 bg-slate-50 border-t border-slate-100 flex justify-end">
+        <div className="p-4 pb-safe sm:pb-4 bg-slate-50 border-t border-slate-100 flex justify-end shrink-0">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100 transition-all"
+            className="h-10 px-5 rounded-xl bg-white border border-slate-200 text-xs font-bold text-slate-700 hover:bg-slate-100 active:bg-slate-200 transition-all active:scale-95"
           >
             Cerrar
           </button>

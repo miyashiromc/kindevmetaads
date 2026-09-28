@@ -1032,39 +1032,39 @@ export const App: React.FC = () => {
                   </p>
                 </div>
 
-                {/* Controles de Búsqueda y Filtro */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="relative flex-1 sm:w-64">
-                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                {/* Controles de Búsqueda y Filtro (Mobile-First) */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full md:w-auto">
+                  <div className="relative w-full sm:w-64">
+                    <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                     <input
                       type="text"
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
                       placeholder="Buscar por cliente o teléfono..."
-                      className="w-full pl-9 pr-3 py-2 rounded-xl bg-white border border-slate-300 text-slate-900 text-xs placeholder-slate-400 focus:outline-none focus:border-violet-600 shadow-sm"
+                      className="w-full pl-9 pr-3 py-2.5 rounded-xl bg-white border border-slate-200 text-slate-900 text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-600 shadow-xs transition-all"
                     />
                   </div>
 
-                  {/* Selector de filtro */}
-                  <div className="flex items-center gap-1 bg-white border border-slate-300 p-1 rounded-xl shadow-sm text-xs font-semibold">
-                    <Filter className="w-3.5 h-3.5 text-slate-400 ml-1.5" />
+                  {/* Selector de filtro con scroll táctil suave en móvil */}
+                  <div className="flex items-center gap-1 bg-white/90 border border-slate-200/80 p-1 rounded-xl shadow-xs overflow-x-auto no-scrollbar text-xs font-bold">
+                    <Filter className="w-3.5 h-3.5 text-slate-400 ml-1.5 shrink-0" />
                     <button
                       type="button"
                       onClick={() => setStatusFilter('all')}
-                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                      className={`px-3 py-1.5 rounded-lg transition-all shrink-0 active:scale-95 ${
                         statusFilter === 'all'
-                          ? 'bg-slate-900 text-white'
+                          ? 'bg-slate-900 text-white shadow-xs'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                       }`}
                     >
-                      Todos
+                      Todos ({tenantLeads.length})
                     </button>
                     <button
                       type="button"
                       onClick={() => setStatusFilter('prospecto')}
-                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                      className={`px-3 py-1.5 rounded-lg transition-all shrink-0 active:scale-95 ${
                         statusFilter === 'prospecto'
-                          ? 'bg-slate-900 text-white'
+                          ? 'bg-slate-900 text-white shadow-xs'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                       }`}
                     >
@@ -1073,9 +1073,9 @@ export const App: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setStatusFilter('anticipo')}
-                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                      className={`px-3 py-1.5 rounded-lg transition-all shrink-0 active:scale-95 ${
                         statusFilter === 'anticipo'
-                          ? 'bg-violet-600 text-white'
+                          ? 'bg-violet-600 text-white shadow-xs'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                       }`}
                     >
@@ -1084,9 +1084,9 @@ export const App: React.FC = () => {
                     <button
                       type="button"
                       onClick={() => setStatusFilter('cerrado')}
-                      className={`px-2.5 py-1 rounded-lg transition-all ${
+                      className={`px-3 py-1.5 rounded-lg transition-all shrink-0 active:scale-95 ${
                         statusFilter === 'cerrado'
-                          ? 'bg-emerald-600 text-white'
+                          ? 'bg-emerald-600 text-white shadow-xs'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                       }`}
                     >

@@ -72,18 +72,18 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
       {/* 4 KPIs Clave — Rejilla 2x2 en Celulares */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
         
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+        <div className="bg-white/85 backdrop-blur-sm p-3.5 sm:p-5 rounded-2xl border border-slate-200/70 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
               Facturación CAPI
             </span>
-            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/80 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/60 flex items-center justify-center shrink-0">
               <DollarSign className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
           <div>
             <div className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight truncate">
-              ${totalRevenue.toFixed(0)} <span className="text-xs text-slate-400 font-sans">USD</span>
+              ${totalRevenue.toFixed(0)} <span className="text-xs text-slate-400 font-sans font-medium">USD</span>
             </div>
             <div className="text-[10px] sm:text-[11px] text-emerald-600 font-bold flex items-center gap-1 mt-0.5 truncate">
               <TrendingUp className="w-3 h-3 shrink-0" />
@@ -92,12 +92,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
           </div>
         </div>
 
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+        <div className="bg-white/85 backdrop-blur-sm p-3.5 sm:p-5 rounded-2xl border border-slate-200/70 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
               Conversión
             </span>
-            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-violet-50 text-violet-600 border border-violet-200/80 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-violet-50 text-violet-600 border border-violet-200/60 flex items-center justify-center shrink-0">
               <Award className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
@@ -112,18 +112,18 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
           </div>
         </div>
 
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+        <div className="bg-white/85 backdrop-blur-sm p-3.5 sm:p-5 rounded-2xl border border-slate-200/70 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
               Ticket Promedio
             </span>
-            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/80 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-blue-50 text-blue-600 border border-blue-200/60 flex items-center justify-center shrink-0">
               <Activity className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
           <div>
             <div className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight truncate">
-              ${averageTicket.toFixed(0)} <span className="text-xs text-slate-400 font-sans">USD</span>
+              ${averageTicket.toFixed(0)} <span className="text-xs text-slate-400 font-sans font-medium">USD</span>
             </div>
             <div className="text-[10px] sm:text-[11px] text-slate-500 font-medium truncate mt-0.5">
               Por venta cerrada
@@ -131,18 +131,18 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
           </div>
         </div>
 
-        <div className="bg-white p-3.5 sm:p-5 rounded-2xl border border-slate-200/90 shadow-2xs flex flex-col justify-between">
+        <div className="bg-white/85 backdrop-blur-sm p-3.5 sm:p-5 rounded-2xl border border-slate-200/70 shadow-xs flex flex-col justify-between">
           <div className="flex items-center justify-between mb-2">
             <span className="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider truncate">
               Proyectado
             </span>
-            <div className="w-8 h-8 sm:w-11 sm:h-11 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/80 flex items-center justify-center shrink-0">
+            <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/60 flex items-center justify-center shrink-0">
               <Layers className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
           </div>
           <div>
             <div className="text-lg sm:text-2xl font-black text-slate-900 font-mono tracking-tight truncate">
-              ${projectedRevenue.toFixed(0)} <span className="text-xs text-slate-400 font-sans">USD</span>
+              ${projectedRevenue.toFixed(0)} <span className="text-xs text-slate-400 font-sans font-medium">USD</span>
             </div>
             <div className="text-[10px] sm:text-[11px] text-amber-600 font-bold truncate mt-0.5">
               {pendingLeads.length} en negociación
@@ -153,25 +153,25 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
       </div>
 
       {/* Gráfico 1: Embudo de Conversión & Gráfico 2: Distribución por Servicio */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         
         {/* Embudo de Conversión Visual */}
-        <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
+        <div className="bg-white/85 backdrop-blur-sm p-4 sm:p-6 rounded-2xl border border-slate-200/70 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
                 Embudo Comercial de Conversión (Funnel)
               </h3>
               <p className="text-xs text-slate-500">
-                Paso a paso desde el clic en el anuncio hasta la compra final.
+                Paso a paso desde el contacto de WhatsApp hasta la entrega final.
               </p>
             </div>
-            <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 text-slate-500">
+            <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/60 text-slate-500">
               <Target className="w-4 h-4" />
             </div>
           </div>
 
-          <div className="space-y-3 pt-2">
+          <div className="space-y-3.5 pt-1">
             {funnel.map((step, idx) => {
               const maxVal = leads.length || 1;
               const pct = ((step.count / maxVal) * 100).toFixed(0);
@@ -196,57 +196,57 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
             })}
           </div>
 
-          <div className="bg-slate-50 rounded-2xl p-3.5 border border-slate-200/80 text-xs text-slate-600 space-y-1">
-            <span className="font-bold text-slate-800">💡 Diagnóstico Comercial Kindev:</span>
-            <p className="text-[11px] leading-relaxed">
+          <div className="bg-violet-50/70 rounded-2xl p-3.5 border border-violet-100 text-xs text-violet-950 space-y-1">
+            <span className="font-bold text-violet-900">💡 Diagnóstico Comercial Kindev:</span>
+            <p className="text-[11px] leading-relaxed text-violet-900/80">
               Tu tasa de cierre de contactos a compras es de <strong>{conversionRate}%</strong>, lo cual se ubica en el top 5% del sector B2B de desarrollo de software en Meta Ads.
             </p>
           </div>
         </div>
 
-        {/* Desglose de Ventas por Tipo de Servicio */}
-        <div className="bg-white p-4 sm:p-6 rounded-2xl sm:rounded-3xl border border-slate-200/90 shadow-2xs space-y-4">
+        {/* Desglose de Ventas por Tipo de Servicio (Sin Box-in-Box) */}
+        <div className="bg-white/85 backdrop-blur-sm p-4 sm:p-6 rounded-2xl border border-slate-200/70 shadow-xs space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm font-extrabold text-slate-900 tracking-tight">
                 Ventas por Categoría de Servicio
               </h3>
               <p className="text-xs text-slate-500">
-                Facturación generada según el esquema oficial Kindev 2026.
+                Facturación generada según el tarifario oficial Kindev 2026.
               </p>
             </div>
-            <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 text-slate-500">
+            <div className="p-2 bg-slate-50 rounded-xl border border-slate-200/60 text-slate-500">
               <PieChart className="w-4 h-4" />
             </div>
           </div>
 
-          <div className="space-y-3 pt-2">
+          <div className="divide-y divide-slate-100">
             {serviceList.map((item, idx) => {
               const maxRev = totalRevenue || 1;
               const revPct = ((item.revenue / maxRev) * 100).toFixed(0);
 
               return (
-                <div key={idx} className="p-3 bg-slate-50 rounded-2xl border border-slate-200/70 space-y-2">
+                <div key={idx} className="py-3 space-y-1.5 first:pt-0 last:pb-0">
                   <div className="flex items-center justify-between text-xs">
-                    <div className="min-w-0">
-                      <span className="font-bold text-slate-800 truncate block">
+                    <div className="min-w-0 pr-2">
+                      <span className="font-extrabold text-slate-900 truncate block">
                         {item.service}
                       </span>
-                      <span className="text-[11px] text-slate-500">
+                      <span className="text-[11px] text-slate-400">
                         {item.count} {item.count === 1 ? 'cliente' : 'clientes'}
                       </span>
                     </div>
                     <div className="text-right shrink-0">
                       <span className="font-mono font-black text-slate-900 text-sm">
-                        ${item.revenue.toFixed(2)}
+                        ${item.revenue.toFixed(0)} <span className="text-[10px] text-slate-400 font-sans">USD</span>
                       </span>
-                      <span className="text-[11px] text-slate-400 block">
-                        {revPct}% de facturación
+                      <span className="text-[10px] text-slate-400 block">
+                        {revPct}% del total
                       </span>
                     </div>
                   </div>
 
-                  <div className="w-full bg-slate-200/80 rounded-full h-2 overflow-hidden">
+                  <div className="w-full bg-slate-100 rounded-full h-2 overflow-hidden">
                     <div
                       className="h-full bg-gradient-to-r from-violet-600 to-indigo-600 rounded-full transition-all duration-700"
                       style={{ width: `${Math.max(Number(revPct), 4)}%` }}
