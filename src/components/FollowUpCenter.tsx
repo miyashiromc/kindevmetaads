@@ -16,9 +16,9 @@ interface FollowUpCenterProps {
 }
 
 export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNote }) => {
-  // Filtramos prospectos y en negociación
+  // Filtramos prospectos, cotizados y anticipos
   const pendingLeads = leads.filter(
-    (l) => l.status === 'prospecto' || l.status === 'cotizado' || l.status === 'en_negociacion' || l.status === 'anticipo'
+    (l) => l.status === 'prospecto' || l.status === 'cotizado' || l.status === 'anticipo'
   );
 
   const [selectedLeadId, setSelectedLeadId] = useState<string>(

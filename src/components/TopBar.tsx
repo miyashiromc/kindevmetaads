@@ -2,15 +2,15 @@ import React, { useState, useRef, useEffect } from 'react';
 import { 
   Menu, 
   PlusCircle, 
-  Calendar,
   PanelLeftClose,
   PanelLeftOpen,
   Building2,
   ChevronDown,
   Plus,
-  Check
+  Check,
+  Database
 } from 'lucide-react';
-import { TabView, MetaConfig, WhatsAppBotStatus, ClientAccount, UserRole } from '../types';
+import { TabView, MetaConfig, WhatsAppBotStatus, ClientAccount, UserRole, SystemApisStatus } from '../types';
 
 interface TopBarProps {
   activeTab: TabView;
@@ -19,6 +19,8 @@ interface TopBarProps {
   config: MetaConfig;
   wsStatus: WhatsAppBotStatus;
   onOpenWsStatus: () => void;
+  apisStatus?: SystemApisStatus | null;
+  onOpenMetaToken?: () => void;
   isSidebarCollapsed?: boolean;
   onToggleSidebarCollapse?: () => void;
   // Soporte Multi-Cliente
@@ -37,6 +39,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   config,
   wsStatus,
   onOpenWsStatus,
+  apisStatus,
+  onOpenMetaToken,
   isSidebarCollapsed = false,
   onToggleSidebarCollapse,
   activeTenantId = 'kindev',
@@ -89,12 +93,6 @@ export const TopBar: React.FC<TopBarProps> = ({
   };
 
   const current = tabTitles[activeTab] || tabTitles.kanban;
-
-  const todayStr = new Date().toLocaleDateString('es-EC', {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'short'
-  });
 
   return (
     <header className="bg-white/95 backdrop-blur-md border-b border-slate-200/80 sticky top-0 z-30 px-3 sm:px-6 py-2.5 sm:py-3 transition-all">
@@ -230,41 +228,66 @@ export const TopBar: React.FC<TopBarProps> = ({
           </div>
         </div>
 
-        {/* Lado Derecho: Indicadores Rápidos & Acciones */}
+        {/* Lado Derecho: Indicadores de APIs del Sistema & Acciones */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
           
-          {/* Indicador WhatsApp Rápido en Celulares (Táctil) */}
+          {/* 1. Indicador WhatsApp API (Móvil y Escritorio) */}
           <button
             type="button"
             onClick={onOpenWsStatus}
-            className="lg:hidden flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border bg-slate-50 active:scale-95 text-xs font-bold transition-all"
-            title="Estado WhatsApp"
-          >
-            <span className={`w-2 h-2 rounded-full ${isWsConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <span className="text-[11px] font-mono text-slate-700">
-              {isWsConnected ? 'WS' : 'Offline'}
-            </span>
-          </button>
-
-          {/* Fecha Actual (Escritorio / Tablet) */}
-          <div className="hidden lg:flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-500 text-xs font-semibold">
-            <Calendar className="w-3.5 h-3.5 text-slate-400" />
-            <span className="capitalize">{todayStr}</span>
-          </div>
-
-          {/* Estado WhatsApp (Escritorio) */}
-          <button
-            type="button"
-            onClick={onOpenWsStatus}
-            className={`hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-xl text-xs font-bold border transition-all active:scale-95 ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 ${
               isWsConnected
                 ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
-                : 'bg-slate-50 hover:bg-rose-50 text-slate-600 hover:text-rose-700 border-slate-200'
+                : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100 animate-pulse'
             }`}
+            title="API de WhatsApp (Baileys) — Clic para ver estado o escanear QR"
           >
             <span className={`w-2 h-2 rounded-full ${isWsConnected ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`} />
-            <span>{isWsConnected ? 'WS Activo' : 'WS Desconectado'}</span>
+            <span className="hidden md:inline">{isWsConnected ? 'WhatsApp OK' : 'WhatsApp Inactivo'}</span>
+            <span className="md:hidden">{isWsConnected ? 'WS' : 'WS Off'}</span>
           </button>
+
+          {/* 2. Indicador Meta Marketing / Graph API (Móvil y Escritorio) */}
+          {onOpenMetaToken && (
+            <button
+              type="button"
+              onClick={onOpenMetaToken}
+              className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border text-xs font-bold transition-all active:scale-95 ${
+                apisStatus?.metaMarketing.active
+                  ? 'bg-indigo-50 text-indigo-900 border-indigo-200 hover:bg-indigo-100'
+                  : 'bg-rose-50 text-rose-700 border-rose-300 hover:bg-rose-100 animate-pulse'
+              }`}
+              title="Meta Graph & Marketing API — Clic para abrir Explorer o actualizar token"
+            >
+              <span className={`w-2 h-2 rounded-full ${apisStatus?.metaMarketing.active ? 'bg-indigo-600 animate-pulse' : 'bg-rose-500'}`} />
+              <span className="hidden md:inline">
+                {apisStatus?.metaMarketing.active ? 'Meta Ads OK' : 'Meta Ads Reconectar'}
+              </span>
+              <span className="md:hidden">
+                {apisStatus?.metaMarketing.active ? 'Ads' : 'Ads ⚠️'}
+              </span>
+            </button>
+          )}
+
+          {/* 3. Indicador Meta CAPI (Escritorio / Tablet) */}
+          <button
+            type="button"
+            onClick={onOpenMetaToken}
+            className="hidden lg:flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-700 hover:border-indigo-300 text-xs font-semibold transition-all"
+            title="Meta Conversions API (CAPI Dataset) — Clic para ver detalles"
+          >
+            <span className="w-2 h-2 rounded-full bg-emerald-500" />
+            <span className="font-mono text-[11px]">CAPI OK</span>
+          </button>
+
+          {/* 4. Indicador CRM Firestore (Escritorio grande) */}
+          <div
+            className="hidden xl:flex items-center gap-1.5 px-2 py-1.5 rounded-xl bg-slate-50 border border-slate-200 text-slate-600 text-xs font-semibold"
+            title="Cloud Firestore CRM Sincronizado en tiempo real"
+          >
+            <Database className="w-3 h-3 text-amber-500" />
+            <span className="text-[11px]">CRM OK</span>
+          </div>
 
           {/* Modo Prueba / Producción */}
           <span className={`hidden sm:inline-flex items-center gap-1.5 px-2.5 py-1 rounded-xl text-xs font-bold border ${

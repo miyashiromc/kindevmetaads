@@ -50,23 +50,25 @@ const DEFAULT_LIVE_TELEMETRY: MetaLiveTelemetry = {
   campaign: {
     id: '120246770184380741',
     name: 'capi Clientes Web WhatsApp - Kindev 2026',
-    spend: 21.05,
-    impressions: 3466,
-    clicks: 61,
-    cpc: 0.345,
-    cpm: 6.07,
-    messagingConnections: 15,
-    firstReplies: 15,
-    depth2Replies: 4,
-    depth5Replies: 4,
-    linkClicks: 34,
-    costPerMessage: 1.40,
-    dropRatePercent: 73.3
+    spend: 61.09,
+    impressions: 11478,
+    reach: 6310,
+    frequency: 1.82,
+    clicks: 196,
+    cpc: 0.31,
+    cpm: 5.32,
+    messagingConnections: 45,
+    firstReplies: 43,
+    depth2Replies: 23,
+    depth5Replies: 68,
+    linkClicks: 112,
+    costPerMessage: 1.36,
+    dropRatePercent: 48.9
   },
   platforms: [
-    { platform: 'instagram', spend: 4.98, impressions: 492, clicks: 14, messages: 4, costPerMessage: 1.24, conversionRatePercent: 0.81 },
-    { platform: 'facebook', spend: 13.94, impressions: 2014, clicks: 43, messages: 9, costPerMessage: 1.55, conversionRatePercent: 0.45 },
-    { platform: 'whatsapp', spend: 2.11, impressions: 958, clicks: 4, messages: 2, costPerMessage: 1.05, conversionRatePercent: 0.21 }
+    { platform: 'facebook', spend: 37.34, impressions: 6736, clicks: 132, messages: 28, costPerMessage: 1.33, conversionRatePercent: 0.42 },
+    { platform: 'instagram', spend: 15.66, impressions: 2055, clicks: 46, messages: 10, costPerMessage: 1.57, conversionRatePercent: 0.49 },
+    { platform: 'whatsapp', spend: 8.04, impressions: 2682, clicks: 18, messages: 7, costPerMessage: 1.15, conversionRatePercent: 0.26 }
   ],
   activeAd: {
     id: '120246770184360741',
@@ -130,10 +132,13 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
     }
   };
 
-  // Frecuencia calculada: 3466 impresiones / 2930 alcance = 1.18
-  const adFrequency = 1.18;
+  // Frecuencia calculada en vivo de Meta Graph API
+  const adFrequency = telemetry.campaign.frequency 
+    || (telemetry.campaign.reach && telemetry.campaign.reach > 0 
+        ? parseFloat((telemetry.campaign.impressions / telemetry.campaign.reach).toFixed(2)) 
+        : 1.18);
   // Posición del indicador en el tacómetro (normalizado a % de la barra)
-  const tachometerPosition = Math.min(((adFrequency - 1.0) / (2.5 - 1.0)) * 100, 100);
+  const tachometerPosition = Math.min(Math.max(((adFrequency - 1.0) / (2.5 - 1.0)) * 100, 0), 100);
 
   // Guión de Nota de Voz
   const audioVoiceScript = `¡Hola! Qué gusto saludarte. Vi que te interesa tu página web profesional por $120 USD. Cuéntame brevemente: ¿cuál es el nombre y giro de tu negocio o empresa? Así te muestro un ejemplo similar de nuestro portafolio de Kindev de inmediato para que veas la calidad antes de decidir.`;
@@ -373,10 +378,10 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
     { id: 'reglas_live', label: 'Kill Switch & Feed Real', icon: <ShieldAlert className="w-3.5 h-3.5" />, color: 'text-emerald-500' },
   ];
 
-  // ─── 4. EMBUDO REAL DE CONVERSIÓN BASADO EN TUS LEADS ───
+  // ─── 4. EMBUDO REAL DE CONVERSIÓN BASADO EN TUS LEADS (4 Fases Oficiales) ───
   const totalLeadsCount = leads.length;
-  const cotizadosCount = leads.filter(l => ['cotizado', 'en_negociacion', 'anticipo', 'cerrado'].includes(l.status)).length;
-  const negociacionCount = leads.filter(l => ['en_negociacion', 'anticipo', 'cerrado'].includes(l.status)).length;
+  const cotizadosCount = leads.filter(l => ['cotizado', 'anticipo', 'cerrado'].includes(l.status)).length;
+  const anticiposCount = leads.filter(l => ['anticipo', 'cerrado'].includes(l.status)).length;
   const closedCount = closedLeads.length;
 
   const funnelSteps = useMemo(() => {
@@ -394,25 +399,25 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
         sublabel: 'Alcance & Precio Enviado', 
         value: cotizadosCount, 
         pct: totalLeadsCount > 0 ? Number(((cotizadosCount / base) * 100).toFixed(1)) : 0, 
+        color: 'from-blue-500 to-indigo-500' 
+      },
+      { 
+        label: 'Pagó Anticipo (CAPI)', 
+        sublabel: 'Purchase CAPI Despachado', 
+        value: anticiposCount, 
+        pct: totalLeadsCount > 0 ? Number(((anticiposCount / base) * 100).toFixed(1)) : 0, 
         color: 'from-violet-500 to-purple-500' 
       },
       { 
-        label: 'En Negociación / Anticipo', 
-        sublabel: 'Alineación de Alcance', 
-        value: negociacionCount, 
-        pct: totalLeadsCount > 0 ? Number(((negociacionCount / base) * 100).toFixed(1)) : 0, 
-        color: 'from-emerald-500 to-teal-500' 
-      },
-      { 
-        label: 'Ventas Cerradas (100%)', 
-        sublabel: 'CAPI Purchase Despachado', 
+        label: 'Entregado / Cerrado', 
+        sublabel: 'Proyecto Concluido & Facturado', 
         value: closedCount, 
         pct: totalLeadsCount > 0 ? Number(((closedCount / base) * 100).toFixed(1)) : 0, 
         color: 'from-emerald-600 to-emerald-500',
         bottleneck: closedCount === 0 && totalLeadsCount > 5
       },
     ];
-  }, [totalLeadsCount, cotizadosCount, negociacionCount, closedCount]);
+  }, [totalLeadsCount, cotizadosCount, anticiposCount, closedCount]);
 
   return (
     <div className="space-y-4 sm:space-y-5 animate-fade-in pb-12">
@@ -733,82 +738,119 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
             </p>
           </div>
 
-          {/* ─── Matriz de Plataformas ─── */}
+          {/* ─── Matriz de Plataformas Reales ─── */}
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {telemetry.platforms.map((plat) => {
-              const isInstagram = plat.platform === 'instagram';
-              const isFacebook = plat.platform === 'facebook';
-              const gradientBg = isInstagram 
-                ? 'from-fuchsia-500/5 via-purple-500/5 to-pink-500/5' 
-                : isFacebook 
-                ? 'from-blue-500/5 to-sky-500/5' 
-                : 'from-emerald-500/5 to-teal-500/5';
-              const ringColor = isInstagram 
-                ? 'ring-purple-200/60' 
-                : isFacebook 
-                ? 'ring-blue-200/60' 
-                : 'ring-emerald-200/60';
+            {(() => {
+              // Calcular plataforma con menor coste por mensaje (mínimo 1 mensaje)
+              const validPlats = telemetry.platforms.filter((p) => p.messages > 0);
+              const bestCostPlat = validPlats.reduce((best, cur) => {
+                if (!best) return cur;
+                return cur.costPerMessage > 0 && cur.costPerMessage < best.costPerMessage ? cur : best;
+              }, null as typeof telemetry.platforms[0] | null);
 
-              return (
-                <div 
-                  key={plat.platform}
-                  className={`group p-4 sm:p-5 rounded-2xl bg-gradient-to-b ${gradientBg} ring-1 ${ringColor} hover:shadow-md transition-all duration-300 space-y-3 animate-slide-up`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2.5">
-                      <div className={`p-1.5 rounded-lg ${isInstagram ? 'bg-gradient-to-br from-fuchsia-500 to-pink-500' : isFacebook ? 'bg-blue-600' : 'bg-emerald-600'} text-white shadow-sm`}>
-                        {isInstagram ? (
-                          <InstagramIcon className="w-4 h-4" />
-                        ) : isFacebook ? (
-                          <FacebookIcon className="w-4 h-4" />
-                        ) : (
-                          <MessageSquare className="w-4 h-4" />
-                        )}
+              const highestConvPlat = validPlats.reduce((best, cur) => {
+                if (!best) return cur;
+                return cur.conversionRatePercent > best.conversionRatePercent ? cur : best;
+              }, null as typeof telemetry.platforms[0] | null);
+
+              return telemetry.platforms.map((plat) => {
+                const isInstagram = plat.platform === 'instagram';
+                const isFacebook = plat.platform === 'facebook';
+                const isLowestCost = bestCostPlat?.platform === plat.platform;
+                const isHighestConv = highestConvPlat?.platform === plat.platform;
+
+                const gradientBg = isInstagram 
+                  ? 'from-fuchsia-500/5 via-purple-500/5 to-pink-500/5' 
+                  : isFacebook 
+                  ? 'from-blue-500/5 to-sky-500/5' 
+                  : 'from-emerald-500/5 to-teal-500/5';
+                const ringColor = isInstagram 
+                  ? 'ring-purple-200/60' 
+                  : isFacebook 
+                  ? 'ring-blue-200/60' 
+                  : 'ring-emerald-200/60';
+
+                // Generar recomendación/diagnóstico 100% dinámico
+                let dynamicDescription = '';
+                if (isLowestCost && plat.messages > 0) {
+                  dynamicDescription = `Canal con menor costo por mensaje ($${plat.costPerMessage.toFixed(2)} USD). Máxima rentabilidad por chat.`;
+                } else if (isHighestConv && plat.messages > 0) {
+                  dynamicDescription = `Mayor tasa de conversión a mensajes (${plat.conversionRatePercent}%). Alta afinidad del público.`;
+                } else if (plat.messages >= 20) {
+                  dynamicDescription = `Mayor volumen de prospección (${plat.messages} chats captados). Motor de volumen principal.`;
+                } else if (plat.messages > 0) {
+                  dynamicDescription = `${plat.messages} conversaciones iniciadas con un gasto de $${plat.spend.toFixed(2)} USD.`;
+                } else {
+                  dynamicDescription = `Sin mensajes registrados en el período ($${plat.spend.toFixed(2)} gastados).`;
+                }
+
+                return (
+                  <div 
+                    key={plat.platform}
+                    className={`group p-4 sm:p-5 rounded-2xl bg-gradient-to-b ${gradientBg} ring-1 ${ringColor} hover:shadow-md transition-all duration-300 space-y-3 animate-slide-up`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className={`p-1.5 rounded-lg ${isInstagram ? 'bg-gradient-to-br from-fuchsia-500 to-pink-500' : isFacebook ? 'bg-blue-600' : 'bg-emerald-600'} text-white shadow-sm`}>
+                          {isInstagram ? (
+                            <InstagramIcon className="w-4 h-4" />
+                          ) : isFacebook ? (
+                            <FacebookIcon className="w-4 h-4" />
+                          ) : (
+                            <MessageSquare className="w-4 h-4" />
+                          )}
+                        </div>
+                        <span className="text-xs font-black text-slate-900 capitalize">
+                          {plat.platform}
+                        </span>
                       </div>
-                      <span className="text-xs font-black text-slate-900 capitalize">
-                        {plat.platform}
-                      </span>
+
+                      {isLowestCost && plat.messages > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20 text-[10px] font-black">
+                          🏆 Menor Coste/Msg
+                        </span>
+                      )}
+                      {!isLowestCost && isHighestConv && plat.messages > 0 && (
+                        <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-fuchsia-500/10 to-pink-500/10 text-fuchsia-700 ring-1 ring-fuchsia-500/20 text-[10px] font-black">
+                          ⚡ Mayor Conversión
+                        </span>
+                      )}
+                      {!isLowestCost && !isHighestConv && plat.messages >= 20 && (
+                        <span className="px-2 py-0.5 rounded-full bg-blue-500/10 text-blue-700 ring-1 ring-blue-500/20 text-[10px] font-black">
+                          🔥 Mayor Volumen
+                        </span>
+                      )}
                     </div>
 
-                    {isInstagram && (
-                      <span className="px-2 py-0.5 rounded-full bg-gradient-to-r from-fuchsia-500/10 to-pink-500/10 text-fuchsia-700 ring-1 ring-fuchsia-500/20 text-[10px] font-black">
-                        🏆 +50% eficiente
-                      </span>
-                    )}
+                    {/* Métricas en grid limpio — sin box-in-box redundante */}
+                    <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs pt-2 border-t border-slate-200/40">
+                      <div>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase block">Gasto Real</span>
+                        <span className="font-mono font-bold text-slate-800">${plat.spend.toFixed(2)}</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase block">Mensajes</span>
+                        <span className="font-mono font-bold text-slate-900">{plat.messages} chats</span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase block">Coste/Msg</span>
+                        <span className={`font-mono font-black ${isLowestCost ? 'text-emerald-600' : 'text-slate-800'}`}>
+                          ${plat.costPerMessage.toFixed(2)}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[9px] text-slate-400 font-bold uppercase block">Tasa Conv.</span>
+                        <span className="font-mono font-bold text-slate-800">{plat.conversionRatePercent}%</span>
+                      </div>
+                    </div>
+
+                    <p className="text-[11px] text-slate-500 leading-snug">
+                      {dynamicDescription}
+                    </p>
                   </div>
-
-                  {/* Métricas en grid limpio — sin box-in-box redundante */}
-                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-xs pt-2 border-t border-slate-200/40">
-                    <div>
-                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Gasto</span>
-                      <span className="font-mono font-bold text-slate-800">${plat.spend.toFixed(2)}</span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Mensajes</span>
-                      <span className="font-mono font-bold text-slate-900">{plat.messages} chats</span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Coste/Msg</span>
-                      <span className={`font-mono font-black ${isInstagram ? 'text-emerald-600' : 'text-slate-800'}`}>
-                        ${plat.costPerMessage.toFixed(2)}
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[9px] text-slate-400 font-bold uppercase block">Tasa Conv.</span>
-                      <span className="font-mono font-bold text-slate-800">{plat.conversionRatePercent}%</span>
-                    </div>
-                  </div>
-
-                  <p className="text-[11px] text-slate-500 leading-snug">
-                    {isInstagram 
-                      ? 'Mejor calidad de leads con menor inversión. Canal más eficiente.' 
-                      : isFacebook 
-                      ? 'Alto volumen pero mayor deserción en mensajes.' 
-                      : 'Tráfico directo a número de WhatsApp.'}
-                  </p>
-                </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
 
         </div>

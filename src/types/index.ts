@@ -1,4 +1,4 @@
-export type LeadStatus = 'prospecto' | 'cotizado' | 'en_negociacion' | 'anticipo' | 'cerrado' | 'descartado';
+export type LeadStatus = 'prospecto' | 'cotizado' | 'anticipo' | 'cerrado' | 'descartado';
 
 export interface MetaEventRecord {
   eventName: 'Purchase' | 'Lead' | 'Contact';
@@ -90,6 +90,32 @@ export interface WhatsAppBotStatus {
   hasQr?: boolean;
 }
 
+export interface SystemApisStatus {
+  whatsapp: {
+    active: boolean;
+    status: string;
+    user?: string;
+    processedMessages?: number;
+  };
+  metaMarketing: {
+    active: boolean;
+    status: 'active' | 'expired' | 'error' | 'unconfigured';
+    user?: string;
+    id?: string;
+    error?: string;
+  };
+  metaCapi: {
+    active: boolean;
+    datasetId: string;
+    status: string;
+  };
+  firestore: {
+    active: boolean;
+    cachedLeads: number;
+    status: string;
+  };
+}
+
 export type TabView = 'kanban' | 'analytics' | 'ads_intelligence' | 'ltv_clients' | 'follow_up' | 'quick_list';
 
 export interface AdPerformanceItem {
@@ -125,6 +151,8 @@ export interface MetaLiveCampaignInsights {
   name: string;
   spend: number;
   impressions: number;
+  reach?: number;
+  frequency?: number;
   clicks: number;
   cpc: number;
   cpm: number;

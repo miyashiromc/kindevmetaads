@@ -1006,7 +1006,7 @@ app.get('/api/meta/insights', async (req, res) => {
 
   try {
     const campaignId = '120246770184380741'; // Campaña activa Kindev 2026
-    const campaignUrl = `https://graph.facebook.com/v19.0/${campaignId}/insights?fields=campaign_name,spend,impressions,clicks,cpc,cpm,actions&access_token=${userToken}`;
+    const campaignUrl = `https://graph.facebook.com/v19.0/${campaignId}/insights?fields=campaign_name,spend,impressions,reach,frequency,clicks,cpc,cpm,actions&access_token=${userToken}`;
     const campStatusUrl = `https://graph.facebook.com/v19.0/${campaignId}?fields=name,status,effective_status&access_token=${userToken}`;
     const breakdownUrl = `https://graph.facebook.com/v19.0/${campaignId}/insights?breakdowns=publisher_platform&fields=spend,impressions,clicks,actions&access_token=${userToken}`;
     const adUrl = `https://graph.facebook.com/v19.0/120246770184360741?fields=name,status,creative{title,body}&access_token=${userToken}`;
@@ -1039,16 +1039,25 @@ app.get('/api/meta/insights', async (req, res) => {
 
     const spend = parseFloat(campRow.spend || '21.05');
     const impressions = parseInt(campRow.impressions || '3466', 10);
+    const reach = parseInt(campRow.reach || '2930', 10);
+    const frequency = parseFloat(campRow.frequency || (reach > 0 ? (impressions / reach).toFixed(2) : '1.18'));
     const clicks = parseInt(campRow.clicks || '61', 10);
     const cpc = parseFloat(campRow.cpc || '0.345');
     const cpm = parseFloat(campRow.cpm || '6.07');
     const costPerMessage = messagingConnections > 0 ? parseFloat((spend / messagingConnections).toFixed(2)) : 1.40;
     const dropRatePercent = messagingConnections > 0 ? parseFloat((((messagingConnections - depth2Replies) / messagingConnections) * 100).toFixed(1)) : 73.3;
 
-    // Procesar plataformas
+    // Procesar plataformas reales
     const rawBreakdowns = breakData.data || [];
     const platforms = rawBreakdowns
-      .filter(b => b.publisher_platform !== 'audience_network' || parseFloat(b.spend) > 0)
+      .filter(b => {
+        const pSpend = parseFloat(b.spend || '0');
+        const pActions = b.actions || [];
+        const pMessages = parseInt(pActions.find(a => a.action_type === 'onsite_conversion.total_messaging_connection')?.value || '0', 10);
+        // Excluir plataformas sin gasto relevante ni mensajes (ej: audience_network con $0.05 y 0 chats)
+        if (b.publisher_platform === 'audience_network' && pMessages === 0 && pSpend < 1) return false;
+        return pSpend > 0 || pMessages > 0;
+      })
       .map(b => {
         const pActions = b.actions || [];
         const pMessages = pActions.find(a => a.action_type === 'onsite_conversion.total_messaging_connection')?.value || 0;
@@ -1080,6 +1089,8 @@ app.get('/api/meta/insights', async (req, res) => {
         effectiveStatus: campStatusData.effective_status || 'PAUSED',
         spend,
         impressions,
+        reach,
+        frequency,
         clicks,
         cpc,
         cpm,
@@ -1105,11 +1116,11 @@ app.get('/api/meta/insights', async (req, res) => {
         bodySnippet: adData.creative?.body ? adData.creative.body.slice(0, 200) + '...' : '¿Aún no tienes tu página web? En Kindev creamos tu sitio web por $120 USD...'
       },
       killSwitch: {
-        enabled: true,
-        maxCostPerMessage: 4.00,
-        maxSpendWithoutLead: 4.00,
+        enabled: false,
+        maxCostPerMessage: null,
+        maxSpendWithoutLead: null,
         currentCost: costPerMessage,
-        statusText: costPerMessage <= 4.00 ? 'Óptimo — Bajo umbral de seguridad' : 'Alerta — Por encima del umbral'
+        statusText: 'Desactivado — Ejecución continua sin pausas automáticas'
       }
     };
 
@@ -1122,6 +1133,135 @@ app.get('/api/meta/insights', async (req, res) => {
     if (metaTelemetryCache) {
       return res.json({ ...metaTelemetryCache, cached: true, warning: err.message });
     }
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+// 5. Endpoint para actualizar dinámicamente el Token de Meta (Marketing o CAPI)
+app.post('/api/meta/update-token', async (req, res) => {
+  const { token, type = 'user' } = req.body || {};
+  if (!token || typeof token !== 'string') {
+    return res.status(400).json({ success: false, error: 'Token no proporcionado o inválido' });
+  }
+
+  const cleanToken = token.trim();
+
+  try {
+    // Validar token contra Meta Graph API
+    const testRes = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${cleanToken}`);
+    const testData = await testRes.json();
+
+    if (testData.error) {
+      return res.status(400).json({
+        success: false,
+        error: testData.error.message || 'Token inválido o expirado devuelto por Meta'
+      });
+    }
+
+    // Actualizar archivo meta_access_token.txt
+    const credsPath = path.join(__dirname, 'meta_access_token.txt');
+    let content = '';
+    if (fs.existsSync(credsPath)) {
+      content = fs.readFileSync(credsPath, 'utf8');
+    }
+
+    const varName = type === 'capi' ? 'META_ACCESS_TOKEN' : 'META_USER_TOKEN';
+    const regex = new RegExp(`^${varName}=.*$`, 'm');
+
+    if (regex.test(content)) {
+      content = content.replace(regex, `${varName}=${cleanToken}`);
+    } else {
+      content += `\n${varName}=${cleanToken}\n`;
+    }
+
+    fs.writeFileSync(credsPath, content, 'utf8');
+
+    // Invalidar caché de telemetría de Meta para forzar lectura inmediata
+    metaTelemetryCache = null;
+    lastMetaFetchTime = 0;
+
+    console.log(`🔑 [Meta Token] Token ${varName} actualizado con éxito para el usuario: ${testData.name} (${testData.id})`);
+
+    return res.json({
+      success: true,
+      message: 'Token de Meta actualizado y validado correctamente',
+      user: testData.name,
+      id: testData.id
+    });
+  } catch (err) {
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// 6. Endpoint de Diagnóstico y Estado en Vivo de todas las APIs
+app.get('/api/system/apis-status', async (req, res) => {
+  try {
+    const { userToken, capiToken, datasetId } = getMetaTokens();
+
+    // 1. WhatsApp status
+    const isWsConnected = connectionStatus === 'connected';
+    const wsStatusObj = {
+      active: isWsConnected,
+      status: connectionStatus,
+      user: connectedUser,
+      processedMessages: processedMessageIds.size,
+      trackedOutbound: outboundPhonesMap.size
+    };
+
+    // 2. Meta Marketing API status (verificación en vivo)
+    let marketingStatus = {
+      active: false,
+      status: 'unconfigured',
+      user: '',
+      id: '',
+      error: ''
+    };
+
+    if (userToken) {
+      try {
+        const meRes = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${userToken}`);
+        const meData = await meRes.json();
+        if (meData.error) {
+          marketingStatus = {
+            active: false,
+            status: meData.error.code === 190 ? 'expired' : 'error',
+            error: meData.error.message
+          };
+        } else {
+          marketingStatus = {
+            active: true,
+            status: 'active',
+            user: meData.name || 'Conectado',
+            id: meData.id
+          };
+        }
+      } catch (e) {
+        marketingStatus = { active: false, status: 'error', error: e.message };
+      }
+    }
+
+    // 3. Meta Conversions API (CAPI) status
+    const capiStatusObj = {
+      active: Boolean(capiToken && datasetId),
+      datasetId: datasetId || '1368429478371391',
+      status: (capiToken && datasetId) ? 'active' : 'unconfigured'
+    };
+
+    // 4. Firestore CRM status
+    const firestoreStatusObj = {
+      active: true,
+      cachedLeads: existingFirestoreLeadsByPhone.size,
+      status: 'synchronized'
+    };
+
+    return res.json({
+      timestamp: new Date().toISOString(),
+      whatsapp: wsStatusObj,
+      metaMarketing: marketingStatus,
+      metaCapi: capiStatusObj,
+      firestore: firestoreStatusObj
+    });
+  } catch (err) {
     return res.status(500).json({ error: err.message });
   }
 });

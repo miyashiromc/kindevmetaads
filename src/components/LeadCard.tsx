@@ -8,9 +8,10 @@ interface LeadCardProps {
   onUpdateStatus: (id: string, status: LeadStatus) => void;
   onDelete: (id: string) => void;
   onUpdateName?: (id: string, newName: string) => Promise<void>;
+  onOpenProfile?: (lead: Lead) => void;
 }
 
-export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateStatus, onDelete, onUpdateName }) => {
+export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateStatus, onDelete, onUpdateName, onOpenProfile }) => {
   const isClosed = lead.status === 'cerrado';
   const waLink = `https://wa.me/${lead.phone}`;
 
@@ -48,13 +49,6 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-700 border border-violet-200">
             <Clock className="w-3.5 h-3.5 text-violet-600" />
             Pagó Anticipo (${Number(lead.amount).toFixed(2)})
-          </span>
-        );
-      case 'en_negociacion':
-        return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-            <Clock className="w-3.5 h-3.5 text-amber-600" />
-            En Negociación {lead.amount > 0 ? `($${Number(lead.amount).toFixed(2)})` : ''}
           </span>
         );
       case 'cotizado':
@@ -129,7 +123,17 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
             </div>
           ) : (
             <div className="flex items-center gap-1.5">
-              <h4 className="font-bold text-slate-900 text-base">{lead.name}</h4>
+              <button
+                type="button"
+                onClick={() => onOpenProfile ? onOpenProfile(lead) : onOpenSale(lead)}
+                className="font-bold text-slate-900 text-base text-left hover:text-violet-600 hover:underline transition-colors flex items-center gap-1.5 group"
+                title="Abrir perfil completo del cliente"
+              >
+                <span>{lead.name}</span>
+                <span className="opacity-0 group-hover:opacity-100 text-[11px] font-medium text-violet-600 transition-opacity">
+                  (ver perfil)
+                </span>
+              </button>
               {onUpdateName && (
                 <button
                   type="button"
@@ -138,7 +142,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
                     setIsEditingName(true);
                   }}
                   className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors shrink-0 touch-manipulation"
-                  title="Modificar nombre"
+                  title="Modificar nombre rápido"
                 >
                   <Pencil className="w-3.5 h-3.5" />
                 </button>
@@ -226,7 +230,6 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
         >
           <option value="prospecto">Prospecto</option>
           <option value="cotizado">Cotizado</option>
-          <option value="en_negociacion">Negociación</option>
           <option value="anticipo">Anticipo</option>
           <option value="cerrado">Cerrado</option>
           <option value="descartado">Descartado</option>

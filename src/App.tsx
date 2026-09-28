@@ -11,7 +11,8 @@ import {
   WhatsAppBotStatus,
   TabView,
   ClientAccount,
-  UserRole
+  UserRole,
+  SystemApisStatus
 } from './types';
 import { dispatchMetaCAPI } from './lib/meta-capi';
 import { getFbc, getFbp, generateEventId, trackPixelEvent } from './lib/meta-tracker';
@@ -28,8 +29,10 @@ import { StatsGrid } from './components/StatsGrid';
 import { LeadForm } from './components/LeadForm';
 import { LeadCard } from './components/LeadCard';
 import { SaleModal } from './components/SaleModal';
+import { LeadProfileModal } from './components/LeadProfileModal';
 import { ConfigModal } from './components/ConfigModal';
 import { WhatsAppStatusModal } from './components/WhatsAppStatusModal';
+import { MetaTokenModal } from './components/MetaTokenModal';
 import { BottomNav } from './components/BottomNav';
 import { Toast, ToastData } from './components/Toast';
 
@@ -244,8 +247,12 @@ export const App: React.FC = () => {
 
   // 5. Modales y Notificaciones
   const [saleLead, setSaleLead] = useState<Lead | null>(null);
+  const [saleTargetStatus, setSaleTargetStatus] = useState<'anticipo' | 'cerrado'>('cerrado');
+  const [profileLead, setProfileLead] = useState<Lead | null>(null);
   const [isConfigOpen, setIsConfigOpen] = useState<boolean>(false);
   const [isWsModalOpen, setIsWsModalOpen] = useState<boolean>(false);
+  const [isMetaTokenModalOpen, setIsMetaTokenModalOpen] = useState<boolean>(false);
+  const [apisStatus, setApisStatus] = useState<SystemApisStatus | null>(null);
   const [wsStatus, setWsStatus] = useState<WhatsAppBotStatus>({
     status: 'disconnected',
     isListening: false,
@@ -360,6 +367,21 @@ export const App: React.FC = () => {
     }
   };
 
+  // Consultar estado de todas las APIs del sistema (WhatsApp, Meta Marketing, Meta CAPI, Firestore)
+  const refreshApisStatus = async () => {
+    try {
+      const res = await fetch('/api/system/apis-status', {
+        signal: AbortSignal.timeout(3000)
+      });
+      if (res.ok) {
+        const data: SystemApisStatus = await res.json();
+        setApisStatus(data);
+      }
+    } catch {
+      // Localhost o servidor no disponible temporalmente
+    }
+  };
+
   useEffect(() => {
     if (!isUnlocked) return;
 
@@ -396,7 +418,11 @@ export const App: React.FC = () => {
     let interval: NodeJS.Timeout | undefined;
     if (isLocalEnvironment) {
       refreshWhatsAppStatus();
-      interval = setInterval(refreshWhatsAppStatus, 30000);
+      refreshApisStatus();
+      interval = setInterval(() => {
+        refreshWhatsAppStatus();
+        refreshApisStatus();
+      }, 30000);
     }
 
     return () => {
@@ -416,11 +442,11 @@ export const App: React.FC = () => {
   // Cálculo de KPIs / Estadísticas para el tenant activo
   const stats: DashboardStats = useMemo(() => {
     const totalLeads = tenantLeads.length;
-    const closedList = tenantLeads.filter((l) => l.status === 'cerrado');
+    const closedList = tenantLeads.filter((l) => l.status === 'cerrado' || l.status === 'anticipo');
     const closedLeads = closedList.length;
     const totalRevenue = closedList.reduce((acc, curr) => acc + (curr.amount || 0), 0);
     const pendingLeads = tenantLeads.filter(
-      (l) => l.status === 'prospecto' || l.status === 'cotizado' || l.status === 'en_negociacion' || l.status === 'anticipo'
+      (l) => l.status === 'prospecto' || l.status === 'cotizado'
     ).length;
 
     return {
@@ -444,8 +470,8 @@ export const App: React.FC = () => {
           ? true
           : statusFilter === 'prospecto'
           ? lead.status === 'prospecto' || lead.status === 'cotizado'
-          : statusFilter === 'en_negociacion'
-          ? lead.status === 'en_negociacion' || lead.status === 'anticipo'
+          : statusFilter === 'anticipo'
+          ? lead.status === 'anticipo'
           : lead.status === statusFilter;
 
       return matchesSearch && matchesStatus;
@@ -586,6 +612,9 @@ export const App: React.FC = () => {
 
   const handleUpdateStatus = async (id: string, newStatus: LeadStatus) => {
     try {
+      const target = leads.find((l) => l.id === id);
+      const hadPurchase = target?.metaEvents?.some((e) => e.eventName === 'Purchase');
+
       if (firestoreConnected) {
         const leadRef = doc(db, 'leads', id);
         await updateDoc(leadRef, { status: newStatus });
@@ -594,7 +623,12 @@ export const App: React.FC = () => {
         setLeads(updated);
         localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
       }
-      showToast(`Estado cambiado a: ${newStatus}`, 'info');
+
+      if (newStatus === 'cerrado' && hadPurchase) {
+        showToast('Proyecto marcado como Entregado / Cerrado (Purchase ya enviado a Meta en anticipo)', 'success');
+      } else {
+        showToast(`Estado cambiado a: ${newStatus}`, 'info');
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al actualizar estado';
       showToast(msg, 'error');
@@ -620,7 +654,27 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleConfirmSale = async (leadId: string, amount: number, note?: string) => {
+  const handleSaveLeadProfile = async (leadId: string, updates: Partial<Lead>) => {
+    try {
+      if (firestoreConnected) {
+        const leadRef = doc(db, 'leads', leadId);
+        await updateDoc(leadRef, updates);
+      } else {
+        const updated = leads.map((l) => (l.id === leadId ? { ...l, ...updates } : l));
+        setLeads(updated);
+        localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
+      }
+      // Actualizar también el modal si está abierto
+      setProfileLead((prev) => (prev && prev.id === leadId ? { ...prev, ...updates } : prev));
+      showToast('Perfil del cliente actualizado correctamente', 'success');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Error al guardar perfil del cliente';
+      showToast(msg, 'error');
+      throw err;
+    }
+  };
+
+  const handleConfirmSale = async (leadId: string, amount: number, note?: string, targetStatus: 'anticipo' | 'cerrado' = 'cerrado') => {
     const targetLead = leads.find((l) => l.id === leadId);
     if (!targetLead) return;
 
@@ -676,7 +730,7 @@ export const App: React.FC = () => {
       if (firestoreConnected) {
         const leadRef = doc(db, 'leads', leadId);
         await updateDoc(leadRef, {
-          status: 'cerrado',
+          status: targetStatus,
           amount,
           notes: updatedNotes,
           saleDate: new Date().toISOString(),
@@ -687,7 +741,7 @@ export const App: React.FC = () => {
           l.id === leadId
             ? {
                 ...l,
-                status: 'cerrado' as LeadStatus,
+                status: targetStatus,
                 amount,
                 notes: updatedNotes,
                 saleDate: new Date().toISOString(),
@@ -699,7 +753,11 @@ export const App: React.FC = () => {
         localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
       }
 
-      showToast(`¡Venta de $${amount.toFixed(2)} USD enviada a Meta CAPI! (Trace: ${capiRes.fbtraceId})`, 'success');
+      if (targetStatus === 'anticipo') {
+        showToast(`¡Anticipo registrado y Purchase de $${amount.toFixed(2)} USD enviado a Meta CAPI! (Trace: ${capiRes.fbtraceId})`, 'success');
+      } else {
+        showToast(`¡Venta de $${amount.toFixed(2)} USD enviada a Meta CAPI! (Trace: ${capiRes.fbtraceId})`, 'success');
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error enviando evento a Meta CAPI';
       showToast(msg, 'error');
@@ -853,7 +911,7 @@ export const App: React.FC = () => {
         wsStatus={wsStatus}
         kanbanCount={tenantLeads.filter((l) => l.status !== 'descartado').length}
         closedCount={tenantLeads.filter((l) => l.status === 'cerrado').length}
-        followUpCount={tenantLeads.filter((l) => ['prospecto', 'cotizado', 'en_negociacion'].includes(l.status)).length}
+        followUpCount={tenantLeads.filter((l) => ['prospecto', 'cotizado'].includes(l.status)).length}
         firestoreConnected={firestoreConnected}
         onOpenConfig={() => setIsConfigOpen(true)}
         onOpenWsStatus={() => setIsWsModalOpen(true)}
@@ -876,6 +934,8 @@ export const App: React.FC = () => {
           config={activeTenant.metaConfig || config}
           wsStatus={wsStatus}
           onOpenWsStatus={() => setIsWsModalOpen(true)}
+          apisStatus={apisStatus}
+          onOpenMetaToken={() => setIsMetaTokenModalOpen(true)}
           isSidebarCollapsed={isSidebarCollapsed}
           onToggleSidebarCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           activeTenantId={activeTenantId}
@@ -920,9 +980,13 @@ export const App: React.FC = () => {
           <KanbanBoard
             leads={tenantLeads}
             onUpdateStatus={handleUpdateStatus}
-            onOpenSaleModal={(lead) => setSaleLead(lead)}
+            onOpenSaleModal={(lead, targetStatus = 'cerrado') => {
+              setSaleLead(lead);
+              setSaleTargetStatus(targetStatus);
+            }}
             onAddNewLead={() => setActiveTab('quick_list')}
             onUpdateName={handleUpdateLeadName}
+            onOpenLeadProfile={(lead) => setProfileLead(lead)}
             isSidebarCollapsed={isSidebarCollapsed}
             onToggleSidebarCollapse={() => setIsSidebarCollapsed((prev) => !prev)}
           />
@@ -1008,14 +1072,14 @@ export const App: React.FC = () => {
                     </button>
                     <button
                       type="button"
-                      onClick={() => setStatusFilter('en_negociacion')}
+                      onClick={() => setStatusFilter('anticipo')}
                       className={`px-2.5 py-1 rounded-lg transition-all ${
-                        statusFilter === 'en_negociacion'
-                          ? 'bg-slate-900 text-white'
+                        statusFilter === 'anticipo'
+                          ? 'bg-violet-600 text-white'
                           : 'text-slate-600 hover:text-slate-900 hover:bg-slate-50'
                       }`}
                     >
-                      Negociación
+                      Anticipo
                     </button>
                     <button
                       type="button"
@@ -1054,6 +1118,7 @@ export const App: React.FC = () => {
                         onUpdateStatus={handleUpdateStatus}
                         onDelete={handleDelete}
                         onUpdateName={handleUpdateLeadName}
+                        onOpenProfile={(l) => setProfileLead(l)}
                       />
                     ))}
                   </div>
@@ -1135,7 +1200,7 @@ export const App: React.FC = () => {
         onSelectTab={(tab) => setActiveTab(tab)}
         kanbanCount={tenantLeads.filter((l) => l.status !== 'descartado' && l.status !== 'cerrado').length}
         closedCount={tenantLeads.filter((l) => l.status === 'cerrado').length}
-        followUpCount={tenantLeads.filter((l) => ['prospecto', 'cotizado', 'en_negociacion'].includes(l.status)).length}
+        followUpCount={tenantLeads.filter((l) => ['prospecto', 'cotizado'].includes(l.status)).length}
       />
 
       {/* Modal de Gestión Multi-Cliente */}
@@ -1150,11 +1215,26 @@ export const App: React.FC = () => {
         onShowToast={showToast}
       />
 
-      {/* Modal de Cierre de Venta */}
+      {/* Modal de Cierre de Venta / Anticipo */}
       <SaleModal
         lead={saleLead}
+        targetStatus={saleTargetStatus}
         onClose={() => setSaleLead(null)}
         onConfirmSale={handleConfirmSale}
+      />
+
+      {/* Modal de Perfil Completo del Cliente */}
+      <LeadProfileModal
+        lead={profileLead}
+        isOpen={Boolean(profileLead)}
+        onClose={() => setProfileLead(null)}
+        onSaveLead={handleSaveLeadProfile}
+        onDeleteLead={handleDelete}
+        onOpenSaleModal={(l, targetStatus) => {
+          setProfileLead(null);
+          setSaleLead(l);
+          if (targetStatus) setSaleTargetStatus(targetStatus);
+        }}
       />
 
       {/* Modal de Configuración y Seguridad */}
@@ -1172,6 +1252,17 @@ export const App: React.FC = () => {
         status={wsStatus}
         onClose={() => setIsWsModalOpen(false)}
         onRefresh={refreshWhatsAppStatus}
+        onShowToast={showToast}
+      />
+
+      {/* Modal de Conexión y Actualización de Meta Token */}
+      <MetaTokenModal
+        isOpen={isMetaTokenModalOpen}
+        onClose={() => setIsMetaTokenModalOpen(false)}
+        onTokenUpdated={() => {
+          refreshApisStatus();
+        }}
+        apisStatus={apisStatus}
         onShowToast={showToast}
       />
 

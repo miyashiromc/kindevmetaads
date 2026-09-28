@@ -21,7 +21,7 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
   const averageTicket = closedLeads.length > 0 ? totalRevenue / closedLeads.length : 0;
   
   const pendingLeads = leads.filter(
-    (l) => l.status === 'prospecto' || l.status === 'cotizado' || l.status === 'en_negociacion' || l.status === 'anticipo'
+    (l) => l.status === 'prospecto' || l.status === 'cotizado' || l.status === 'anticipo'
   );
   const projectedRevenue = pendingLeads.reduce((acc, curr) => acc + (curr.amount || 120), 0);
 
@@ -46,26 +46,21 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
     .map(([service, data]) => ({ service, ...data }))
     .sort((a, b) => b.revenue - a.revenue);
 
-  // 2. Embudo de ventas (Funnel counts)
+  // 2. Embudo de ventas (Funnel counts - 4 Fases Oficiales)
   const funnel = [
-    { label: 'Total Contactos', count: leads.length, color: 'bg-slate-400' },
+    { label: '1. Nuevos Leads', count: leads.length, color: 'bg-slate-400' },
     { 
-      label: 'Cotizados / En Curso', 
-      count: leads.filter((l) => ['cotizado', 'en_negociacion', 'anticipo', 'cerrado'].includes(l.status)).length,
+      label: '2. Cotizados', 
+      count: leads.filter((l) => ['cotizado', 'anticipo', 'cerrado'].includes(l.status)).length,
       color: 'bg-blue-500'
     },
     { 
-      label: 'Negociación Avanzada', 
-      count: leads.filter((l) => ['en_negociacion', 'anticipo', 'cerrado'].includes(l.status)).length,
-      color: 'bg-amber-500'
-    },
-    { 
-      label: 'Anticipos Pagados', 
+      label: '3. Pagó Anticipo (CAPI)', 
       count: leads.filter((l) => ['anticipo', 'cerrado'].includes(l.status)).length,
       color: 'bg-violet-500'
     },
     { 
-      label: 'Ventas Cerradas (CAPI)', 
+      label: '4. Entregado / Cerrado', 
       count: closedLeads.length,
       color: 'bg-emerald-500'
     }

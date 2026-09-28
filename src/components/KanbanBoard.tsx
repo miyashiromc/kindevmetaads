@@ -18,7 +18,8 @@ import { Lead, LeadStatus } from '../types';
 interface KanbanBoardProps {
   leads: Lead[];
   onUpdateStatus: (leadId: string, newStatus: LeadStatus) => Promise<void>;
-  onOpenSaleModal: (lead: Lead) => void;
+  onOpenSaleModal: (lead: Lead, targetStatus?: 'anticipo' | 'cerrado') => void;
+  onOpenLeadProfile: (lead: Lead) => void;
   onAddNewLead: () => void;
   onUpdateName?: (leadId: string, newName: string) => Promise<void>;
   isSidebarCollapsed?: boolean;
@@ -49,15 +50,7 @@ const COLUMNS: ColumnConfig[] = [
     badgeBg: 'bg-blue-50 text-blue-800',
     borderColor: 'border-blue-200',
     dotColor: 'bg-blue-500',
-    description: 'Propuesta de precio enviada'
-  },
-  {
-    status: 'en_negociacion',
-    title: 'En Negociación',
-    badgeBg: 'bg-amber-50 text-amber-900',
-    borderColor: 'border-amber-200',
-    dotColor: 'bg-amber-500',
-    description: 'Ajustando alcance o términos'
+    description: 'Propuesta enviada • En seguimiento'
   },
   {
     status: 'anticipo',
@@ -65,7 +58,7 @@ const COLUMNS: ColumnConfig[] = [
     badgeBg: 'bg-violet-50 text-violet-900',
     borderColor: 'border-violet-200',
     dotColor: 'bg-violet-500',
-    description: '50% abonado (En desarrollo)'
+    description: 'Cliente asegurado • Purchase enviado a Meta'
   },
   {
     status: 'cerrado',
@@ -73,7 +66,7 @@ const COLUMNS: ColumnConfig[] = [
     badgeBg: 'bg-emerald-50 text-emerald-900',
     borderColor: 'border-emerald-200',
     dotColor: 'bg-emerald-500',
-    description: '100% Pagado & CAPI Despachado'
+    description: '100% Pagado & Entregado'
   }
 ];
 
@@ -81,6 +74,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   leads,
   onUpdateStatus,
   onOpenSaleModal,
+  onOpenLeadProfile,
   onAddNewLead,
   onUpdateName,
   isSidebarCollapsed,
@@ -134,8 +128,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const getNextStatus = (current: LeadStatus): LeadStatus | null => {
     switch (current) {
       case 'prospecto': return 'cotizado';
-      case 'cotizado': return 'en_negociacion';
-      case 'en_negociacion': return 'anticipo';
+      case 'cotizado': return 'anticipo';
       case 'anticipo': return 'cerrado';
       default: return null;
     }
@@ -144,8 +137,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const getPrevStatus = (current: LeadStatus): LeadStatus | null => {
     switch (current) {
       case 'cerrado': return 'anticipo';
-      case 'anticipo': return 'en_negociacion';
-      case 'en_negociacion': return 'cotizado';
+      case 'anticipo': return 'cotizado';
       case 'cotizado': return 'prospecto';
       default: return null;
     }
@@ -176,8 +168,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     const lead = leads.find((l) => l.id === leadId);
     if (!lead || lead.status === targetStatus) return;
 
-    if (targetStatus === 'cerrado') {
-      onOpenSaleModal(lead);
+    const hasExistingPurchase = lead.metaEvents?.some((ev) => ev.eventName === 'Purchase');
+
+    if (targetStatus === 'anticipo') {
+      if (!hasExistingPurchase) {
+        onOpenSaleModal(lead, 'anticipo');
+      } else {
+        await onUpdateStatus(leadId, 'anticipo');
+      }
+    } else if (targetStatus === 'cerrado') {
+      if (!hasExistingPurchase) {
+        onOpenSaleModal(lead, 'cerrado');
+      } else {
+        await onUpdateStatus(leadId, 'cerrado');
+      }
     } else {
       await onUpdateStatus(leadId, targetStatus);
     }
@@ -188,8 +192,20 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
     const target = direction === 'forward' ? getNextStatus(lead.status) : getPrevStatus(lead.status);
     if (!target) return;
 
-    if (target === 'cerrado') {
-      onOpenSaleModal(lead);
+    const hasExistingPurchase = lead.metaEvents?.some((ev) => ev.eventName === 'Purchase');
+
+    if (target === 'anticipo') {
+      if (!hasExistingPurchase) {
+        onOpenSaleModal(lead, 'anticipo');
+      } else {
+        await onUpdateStatus(lead.id, 'anticipo');
+      }
+    } else if (target === 'cerrado') {
+      if (!hasExistingPurchase) {
+        onOpenSaleModal(lead, 'cerrado');
+      } else {
+        await onUpdateStatus(lead.id, 'cerrado');
+      }
     } else {
       await onUpdateStatus(lead.id, target);
     }
@@ -361,7 +377,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               onDragOver={(e) => handleDragOver(e, col.status)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, col.status)}
-              className={`rounded-2xl border bg-slate-100/90 p-3 sm:p-3.5 flex flex-col w-[86vw] max-w-[340px] shrink-0 snap-center sm:w-auto sm:flex-1 sm:min-w-[280px] xl:min-w-[260px] 2xl:min-w-0 transition-all h-[calc(100dvh-280px)] sm:h-[calc(100vh-215px)] min-h-[480px] sm:min-h-[560px] ${
+              className={`rounded-2xl border bg-slate-100/90 p-3 sm:p-3.5 flex flex-col w-[86vw] max-w-[360px] shrink-0 snap-center sm:w-auto sm:flex-1 sm:min-w-[300px] xl:min-w-[280px] 2xl:min-w-0 transition-all h-[calc(100dvh-280px)] sm:h-[calc(100vh-215px)] min-h-[480px] sm:min-h-[560px] ${
                 isDropTarget
                   ? 'border-violet-500 bg-violet-50/70 ring-2 ring-violet-500/20 shadow-md'
                   : 'border-slate-200/90 shadow-2xs'
@@ -378,7 +394,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   </div>
                   <div className="flex items-center gap-1.5 shrink-0">
                     <span className="sm:hidden text-[10px] font-semibold text-slate-400">
-                      {colIdx + 1}/5
+                      {colIdx + 1}/4
                     </span>
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200 shadow-2xs">
                       {colLeads.length}
@@ -463,12 +479,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                               </div>
                             ) : (
                               <div className="flex items-center gap-1.5 group/title">
-                                <h4
-                                  className="text-xs font-extrabold text-slate-900 truncate"
-                                  title={lead.name}
+                                <button
+                                  type="button"
+                                  onClick={() => onOpenLeadProfile(lead)}
+                                  className="text-left text-xs font-extrabold text-slate-900 hover:text-indigo-600 truncate transition-colors cursor-pointer"
+                                  title="Clic para abrir perfil y editar cliente"
                                 >
                                   {lead.name}
-                                </h4>
+                                </button>
                                 {onUpdateName && (
                                   <button
                                     type="button"
@@ -477,7 +495,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                                       handleStartEditName(lead);
                                     }}
                                     className="p-0.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors shrink-0 touch-manipulation"
-                                    title="Modificar nombre del cliente"
+                                    title="Modificar nombre rápido"
                                   >
                                     <Pencil className="w-3 h-3" />
                                   </button>
@@ -497,20 +515,27 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             </a>
                           </div>
 
-                          {lead.amount > 0 && (
-                            <span className="font-mono text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-lg border border-emerald-200 shrink-0">
-                              ${lead.amount.toFixed(0)}
-                            </span>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => onOpenLeadProfile(lead)}
+                            className="font-mono text-xs font-black text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2 py-0.5 rounded-lg border border-emerald-200 shrink-0 transition-colors"
+                            title="Ver y editar presupuesto"
+                          >
+                            ${Number(lead.amount || 0).toFixed(0)}
+                          </button>
                         </div>
 
-                        {/* Servicio Cotizado / Notas */}
-                        <div className="text-[11px] space-y-1">
-                          <div className="font-semibold text-slate-700 bg-slate-50 px-2.5 py-1 rounded-lg border border-slate-200/80 truncate">
+                        {/* Servicio Cotizado / Notas (Clickeable al perfil) */}
+                        <div 
+                          onClick={() => onOpenLeadProfile(lead)}
+                          className="text-[11px] space-y-1 cursor-pointer group/details"
+                          title="Clic para ver especificaciones y editar perfil"
+                        >
+                          <div className="font-semibold text-slate-700 bg-slate-50 group-hover/details:bg-indigo-50/60 group-hover/details:text-indigo-900 px-2.5 py-1 rounded-lg border border-slate-200/80 group-hover/details:border-indigo-200 truncate transition-all">
                             {lead.service}
                           </div>
                           {lead.notes && (
-                            <p className="text-slate-600 text-[10px] line-clamp-2 italic bg-slate-50/70 p-2 rounded-lg border border-slate-100">
+                            <p className="text-slate-600 text-[10px] line-clamp-2 italic bg-slate-50/70 group-hover/details:bg-indigo-50/40 p-2 rounded-lg border border-slate-100 transition-all">
                               "{lead.notes}"
                             </p>
                           )}
@@ -528,19 +553,48 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                             <ChevronLeft className="w-4 h-4" />
                           </button>
 
-                          {lead.status === 'anticipo' ? (
+                          {lead.status === 'cotizado' ? (
                             <button
                               type="button"
-                              onClick={() => onOpenSaleModal(lead)}
+                              onClick={() => {
+                                const hasExistingPurchase = lead.metaEvents?.some((ev) => ev.eventName === 'Purchase');
+                                if (!hasExistingPurchase) {
+                                  onOpenSaleModal(lead, 'anticipo');
+                                } else {
+                                  onUpdateStatus(lead.id, 'anticipo');
+                                }
+                              }}
+                              className="flex-1 h-9 px-2 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation"
+                              title="Registrar cobro de anticipo y despachar Purchase a Meta"
+                            >
+                              <DollarSign className="w-3.5 h-3.5" />
+                              <span>Pagó Anticipo ➔</span>
+                            </button>
+                          ) : lead.status === 'anticipo' ? (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const hasExistingPurchase = lead.metaEvents?.some((ev) => ev.eventName === 'Purchase');
+                                if (!hasExistingPurchase) {
+                                  onOpenSaleModal(lead, 'cerrado');
+                                } else {
+                                  onUpdateStatus(lead.id, 'cerrado');
+                                }
+                              }}
                               className="flex-1 h-9 px-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation"
+                              title="Marcar proyecto como entregado y cerrado"
                             >
                               <CheckCircle2 className="w-4 h-4" />
-                              <span>Cerrar Venta ➔</span>
+                              <span>Entregar Proyecto ➔</span>
                             </button>
                           ) : (
-                            <span className="text-[10px] text-slate-400 font-semibold truncate text-center flex-1">
-                              {col.title}
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => onOpenLeadProfile(lead)}
+                              className="text-[10px] text-slate-500 hover:text-indigo-600 font-semibold truncate text-center flex-1 transition-colors"
+                            >
+                              Ver Perfil
+                            </button>
                           )}
 
                           <button

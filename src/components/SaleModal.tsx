@@ -5,11 +5,12 @@ import { KINDEV_PRESETS } from '../lib/presets';
 
 interface SaleModalProps {
   lead: Lead | null;
+  targetStatus?: 'anticipo' | 'cerrado';
   onClose: () => void;
-  onConfirmSale: (leadId: string, amount: number, note?: string) => Promise<void>;
+  onConfirmSale: (leadId: string, amount: number, note?: string, targetStatus?: 'anticipo' | 'cerrado') => Promise<void>;
 }
 
-export const SaleModal: React.FC<SaleModalProps> = ({ lead, onClose, onConfirmSale }) => {
+export const SaleModal: React.FC<SaleModalProps> = ({ lead, targetStatus = 'cerrado', onClose, onConfirmSale }) => {
   const [amount, setAmount] = useState<number>(120);
   const [customInput, setCustomInput] = useState<string>('120.00');
   const [note, setNote] = useState<string>('');
@@ -52,7 +53,7 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, onClose, onConfirmSa
 
     setLoading(true);
     try {
-      await onConfirmSale(lead.id, finalAmount, note.trim() || '');
+      await onConfirmSale(lead.id, finalAmount, note.trim() || '', targetStatus);
       onClose();
     } finally {
       setLoading(false);
@@ -74,12 +75,23 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, onClose, onConfirmSa
 
         {/* Encabezado */}
         <div>
-          <div className="w-11 h-11 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center text-xl mb-3 shadow-sm border border-emerald-100">
+          <div className={`w-11 h-11 rounded-2xl flex items-center justify-center text-xl mb-3 shadow-sm border ${
+            targetStatus === 'anticipo'
+              ? 'bg-violet-50 text-violet-600 border-violet-100'
+              : 'bg-emerald-50 text-emerald-600 border-emerald-100'
+          }`}>
             <CheckCircle2 className="w-6 h-6" />
           </div>
-          <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">Cerrar Venta & Enviar a Meta</h3>
+          <h3 className="text-xl font-extrabold text-slate-900 tracking-tight">
+            {targetStatus === 'anticipo' ? 'Registrar Anticipo & Enviar Purchase a Meta' : 'Cerrar Venta & Enviar a Meta'}
+          </h3>
           <p className="text-xs text-slate-500 mt-1 font-medium">
-            Cliente: <span className="font-bold text-slate-800">{lead.name}</span> (+<span className="font-mono text-slate-700">{lead.phone}</span>)
+            {targetStatus === 'anticipo' 
+              ? 'Cliente asegurado. El evento Purchase se despachará de inmediato para acelerar el entrenamiento del algoritmo.' 
+              : 'El proyecto se marcará como cerrado y el evento Purchase se despachará a Meta CAPI.'}
+          </p>
+          <p className="text-xs text-slate-600 mt-1 font-semibold">
+            Cliente: <span className="font-bold text-slate-900">{lead.name}</span> (+<span className="font-mono text-slate-700">{lead.phone}</span>)
           </p>
         </div>
 
@@ -195,7 +207,11 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, onClose, onConfirmSa
         <button
           onClick={handleSubmit}
           disabled={loading || isNaN(parseFloat(customInput)) || parseFloat(customInput) <= 0}
-          className="w-full py-3.5 px-4 rounded-2xl bg-emerald-600 hover:bg-emerald-700 active:scale-[0.98] text-white font-bold text-sm shadow-lg shadow-emerald-600/25 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+          className={`w-full py-3.5 px-4 rounded-2xl active:scale-[0.98] text-white font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
+            targetStatus === 'anticipo'
+              ? 'bg-violet-600 hover:bg-violet-700 shadow-violet-600/25'
+              : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-600/25'
+          }`}
         >
           {loading ? (
             <>
@@ -205,7 +221,11 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, onClose, onConfirmSa
           ) : (
             <>
               <Send className="w-4 h-4" />
-              <span>Enviar ${parseFloat(customInput || '0').toFixed(2)} USD a Meta CAPI</span>
+              <span>
+                {targetStatus === 'anticipo'
+                  ? `Confirmar Anticipo ($${parseFloat(customInput || '0').toFixed(2)} USD) & Despachar Purchase`
+                  : `Enviar $${parseFloat(customInput || '0').toFixed(2)} USD a Meta CAPI`}
+              </span>
             </>
           )}
         </button>
