@@ -207,7 +207,7 @@ function markPhoneProcessed(phone) {
 const OUTBOUND_TRACKER_FILE = path.join(__dirname, 'outbound_tracker.json');
 const PROCESSED_MSGS_FILE = path.join(AUTH_DIR, 'processed_messages.json');
 
-// Mapeo persistente de números a los que nosotros escribimos primero (script de prospección / cold outreach)
+// Mapeo persistente de números y LIDs a los que nosotros escribimos primero (script de prospección / cold outreach)
 const outboundPhonesMap = new Map();
 
 function loadOutboundTracker() {
@@ -217,9 +217,20 @@ function loadOutboundTracker() {
       if (data && typeof data === 'object') {
         for (const [ph, info] of Object.entries(data)) {
           outboundPhonesMap.set(ph, info);
+          const cleanPh = cleanPhone(ph);
+          if (cleanPh) outboundPhonesMap.set(cleanPh, info);
+
+          // Si es un LID, resolver su número de teléfono real mediante lid-mapping
+          const reverseFile = path.join(AUTH_DIR, `lid-mapping-${ph}_reverse.json`);
+          if (fs.existsSync(reverseFile)) {
+            try {
+              const realPn = cleanPhone(JSON.parse(fs.readFileSync(reverseFile, 'utf8')));
+              if (realPn) outboundPhonesMap.set(realPn, info);
+            } catch (e) {}
+          }
         }
       }
-      console.log(`📋 [Outbound Tracker] Cargados ${outboundPhonesMap.size} contactos de prospección previos.`);
+      console.log(`📋 [Outbound Tracker] Cargados ${outboundPhonesMap.size} identificadores y teléfonos de prospección previos.`);
     }
   } catch (err) {
     console.warn('⚠️ No se pudo leer outbound_tracker.json:', err.message);
@@ -243,8 +254,30 @@ function scheduleSaveOutboundTracker() {
   }, 3000);
 }
 
-function isPhoneOutboundTracked(phone) {
-  return outboundPhonesMap.has(phone);
+function isPhoneOutboundTracked(phone, remoteJid = '') {
+  if (!phone && !remoteJid) return false;
+  const cleanPh = cleanPhone(phone);
+  if (cleanPh && outboundPhonesMap.has(cleanPh)) return true;
+  if (phone && outboundPhonesMap.has(phone)) return true;
+
+  if (remoteJid) {
+    const rawUser = remoteJid.split('@')[0].split(':')[0];
+    if (outboundPhonesMap.has(rawUser)) return true;
+    const cleanJid = cleanPhone(rawUser);
+    if (cleanJid && outboundPhonesMap.has(cleanJid)) return true;
+
+    // Si es LID, verificar mapeo inverso en auth_baileys
+    if (remoteJid.endsWith('@lid')) {
+      const reverseFile = path.join(AUTH_DIR, `lid-mapping-${rawUser}_reverse.json`);
+      if (fs.existsSync(reverseFile)) {
+        try {
+          const realPn = cleanPhone(JSON.parse(fs.readFileSync(reverseFile, 'utf8')));
+          if (realPn && (outboundPhonesMap.has(realPn) || outboundPhonesMap.has(rawUser))) return true;
+        } catch (e) {}
+      }
+    }
+  }
+  return false;
 }
 
 function recordOutboundMessage(phone, snippet = '') {
@@ -258,6 +291,10 @@ function recordOutboundMessage(phone, snippet = '') {
   existing.lastSentAt = Date.now();
   if (snippet) existing.snippet = snippet.slice(0, 100);
   outboundPhonesMap.set(phone, existing);
+  const cleanPh = cleanPhone(phone);
+  if (cleanPh && cleanPh !== phone) {
+    outboundPhonesMap.set(cleanPh, existing);
+  }
   scheduleSaveOutboundTracker();
 }
 
@@ -328,6 +365,22 @@ const OUTBOUND_INTEREST_KEYWORDS = [
   'agendar', 'reunion', 'reunión', 'llamada', 'llamar', 'telefono', 'teléfono',
   'propuesta', 'portafolio', 'servicios', 'servicio', 'paquete', 'paquetes', 'planes', 'plan',
   'si por favor', 'sí por favor', 'cuentame', 'cuéntame', 'explicame', 'explícame', 'enviame', 'envíame'
+];
+
+// Patrones inequívocos de auto-respuestas comerciales de empresas o clínicas de prospección externa
+const BUSINESS_AUTOREPLY_PATTERNS = [
+  'gracias por comunicarte', 'gracias por contactar', 'gracias por contactarte', 'gracias por escribir',
+  'gracias por tu mensaje', 'gracias por su mensaje', 'reciba un cordial saludo',
+  'bienvenido a', 'bienvenidos a', 'bienvenid@ a', 'bienvenid@ por nuestra seguridad',
+  'horario de atención', 'horario de atencion', 'nuestro horario',
+  'en este momento no estamos', 'en breve le atenderemos', 'en breve nos pondremos en contacto',
+  'por favor, haznos saber', 'por favor haznos saber', 'cómo podemos ayudarte',
+  'como podemos ayudarte', 'este número ya no es', 'este numero ya no es',
+  'esta equivocado', 'se equivocó', 'se equivoco', 'número equivocado', 'numero equivocado',
+  'veterinaria', 'veterinario', 'veterinarios', 'clínica veterinaria', 'clinica veterinaria',
+  'hospital veterinario', 'pet shop', 'pet care', 'peluquería canina', 'peluqueria canina',
+  'grooming', 'dokidoki', 'vivet', 'san martin', 'arte canina', 'lucky pets', 'don danés', 'don danes',
+  'reserva tu cita', 'nuestros servicios veterinarios', 'salud animal', 'mundo animal', 'centro veterinario'
 ];
 
 // Lista de teléfonos propios o internos a excluir de auto-captura
@@ -463,13 +516,23 @@ async function processIncomingMessage(sock, msg, contextSource = 'live') {
   if (msg.key?.fromMe) {
     const remoteJid = msg.key.remoteJid || '';
     if (remoteJid && !remoteJid.endsWith('@g.us') && !remoteJid.includes('status')) {
-      const clean = cleanPhone(remoteJid.split('@')[0].split(':')[0]);
-      if (clean) {
-        let text =
-          msg.message?.conversation ||
-          msg.message?.extendedTextMessage?.text ||
-          '';
-        recordOutboundMessage(clean, text);
+      const rawUser = remoteJid.split('@')[0].split(':')[0];
+      const clean = cleanPhone(rawUser);
+      let text =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        '';
+      recordOutboundMessage(rawUser, text);
+      if (clean) recordOutboundMessage(clean, text);
+
+      if (remoteJid.endsWith('@lid')) {
+        const reverseFile = path.join(AUTH_DIR, `lid-mapping-${rawUser}_reverse.json`);
+        if (fs.existsSync(reverseFile)) {
+          try {
+            const realPhone = cleanPhone(JSON.parse(fs.readFileSync(reverseFile, 'utf8')));
+            if (realPhone) recordOutboundMessage(realPhone, text);
+          } catch (e) {}
+        }
       }
     }
     return { saved: false, reason: 'from_me' };
@@ -531,52 +594,60 @@ async function processIncomingMessage(sock, msg, contextSource = 'live') {
     else if (isMedia) text = '[Archivo multimedia / Documento recibido]';
   }
 
-  // 9. Detección de origen: Anuncio Meta Ads vs Script Outbound vs Inbound Directo
-  const isFromLidAd = remoteJid.endsWith('@lid') || !!msg.key?.participantAlt;
-  const isOutboundTarget = isPhoneOutboundTracked(phone);
-
+  // 9. Detección de contacto de prospección / script (OUTBOUND)
+  const isOutboundTarget = isPhoneOutboundTracked(phone, remoteJid);
   const lowerText = text.toLowerCase().trim();
 
-  // === RAMA A: CONTACTO PREVIAMENTE CONTACTADO POR NUESTRO SCRIPT (OUTBOUND) ===
-  if (isOutboundTarget && !isFromLidAd) {
-    // A.1: Filtro de descarte para negativas, reclamos o monosílabos fríos
-    const isRejection = OUTBOUND_REJECTION_KEYWORDS.some(kw => lowerText.includes(kw));
-    const isColdShort = ['ok', 'si', 'no', 'bien', 'ya', '👍', '👌', '?', 'ola', 'hola', 'buenas'].includes(lowerText) && lowerText.length <= 6;
+  // === REGLA ESTRICTA: NINGÚN CONTACTO DEL SCRIPT (OUTBOUND) SE AGREGA A FIRESTORE NI A CAPI ===
+  // Aunque responda, pregunte precio o envíe audio, NUNCA se crea como lead en la pantalla.
+  if (isOutboundTarget) {
+    console.log(`🛡️ [Outbound Script Bloqueado] Contacto de prospección ${pushName} (${displayPhone}): "${text}". Omitido rotundamente para no ensuciar el CRM.`);
+    if (msgId) markMessageIdProcessed(msgId);
 
-    if (isRejection || isColdShort) {
-      console.log(`🧹 [Outbound Descartado] Respuesta de prospección fría/negativa de ${pushName} (${displayPhone}): "${text}"`);
-      if (msgId) markMessageIdProcessed(msgId);
-      return { saved: false, reason: 'outbound_rejection' };
+    // Si ya existe como cliente cerrado o con anticipo previo en Firestore, anexamos la nota a su ficha
+    const cleanPh = cleanPhone(phone);
+    const existingLead = existingFirestoreLeadsByPhone.get(cleanPh);
+    if (existingLead && (existingLead.status === 'cerrado' || existingLead.status === 'anticipo' || existingLead.amount > 0)) {
+      try {
+        const updatedNotes = existingLead.notes 
+          ? `${existingLead.notes}\n[WhatsApp ${new Date().toLocaleTimeString()}]: "${text}"`
+          : text;
+        const patchUrl = `${FIRESTORE_REST_URL}/${existingLead.id}?updateMask.fieldPaths=notes&updateMask.fieldPaths=lastContactDate`;
+        fetch(patchUrl, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: {
+              notes: { stringValue: updatedNotes.slice(0, 1500) },
+              lastContactDate: { stringValue: new Date().toISOString() }
+            }
+          })
+        }).catch(() => {});
+        existingLead.notes = updatedNotes;
+      } catch (e) {}
     }
 
-    // A.2: Verificar si demuestra interés calificado
-    const hasInterest = OUTBOUND_INTEREST_KEYWORDS.some(kw => lowerText.includes(kw)) || isAudio;
-    if (!hasInterest && lowerText.length < 15) {
-      console.log(`ℹ️ [Outbound Ignorado] Sin interés comercial explícito de ${pushName} (${displayPhone}): "${text}"`);
-      if (msgId) markMessageIdProcessed(msgId);
-      return { saved: false, reason: 'outbound_unqualified' };
-    }
-
-    // A.3: ¡Lead de prospección calificado! (NO enviar a Meta CAPI para no contaminar audiencias)
-    console.log(`🎯 [Lead Outbound Calificado!] (${contextSource}) De: ${pushName} | Tel: ${displayPhone} - "${text}"`);
-    const saved = await saveLeadToFirestore({
-      name: pushName,
-      phone,
-      displayPhone,
-      service: 'Prospección Calificada WhatsApp',
-      notes: `Respuesta a prospección: "${text}"`,
-      source: 'whatsapp_outreach',
-      eventId: `outreach_${phone}_${Date.now()}`
-    });
-
-    if (saved) {
-      markPhoneProcessed(phone);
-      if (msgId) markMessageIdProcessed(msgId);
-    }
-    return { saved, source: 'whatsapp_outreach' };
+    return { saved: false, reason: 'outbound_script_blocked' };
   }
 
-  // === RAMA B: CLIENTE INBOUND (Clic en Anuncio de Meta Ads o Orgánico Web) ===
+  // 10. Filtro de descarte de auto-respuestas de empresas / veterinarias / bots de prospección externa
+  const isBusinessAutoReply = BUSINESS_AUTOREPLY_PATTERNS.some(p => lowerText.includes(p));
+  if (isBusinessAutoReply) {
+    console.log(`🧹 [Auto-Respuesta / Prospección Externa Descartada] ${pushName} (${displayPhone}): "${text}". No se agrega a Firestore.`);
+    if (msgId) markMessageIdProcessed(msgId);
+    recordOutboundMessage(cleanPhone(phone) || remoteJid.split('@')[0], text);
+    return { saved: false, reason: 'business_autoreply_discarded' };
+  }
+
+  // 11. Detección real de Anuncio Meta Ads (CTWA)
+  const hasMetaAdReferral = !!(
+    msg.message?.extendedTextMessage?.contextInfo?.externalAdReply ||
+    msg.message?.extendedTextMessage?.contextInfo?.advertisementDetails ||
+    msg.message?.extendedTextMessage?.contextInfo?.referral ||
+    msg.message?.templateButtonReplyMessage
+  );
+
+  // === RAMA: CLIENTE INBOUND GENUINO (Clic en Anuncio de Meta Ads o Orgánico Web) ===
   console.log(`🚀 [Lead Inbound Detectado!] (${contextSource}) De: ${pushName} | Tel: ${displayPhone} (JID: ${remoteJid}) - "${text}"`);
 
   // B.1: Despacho a Meta CAPI (solo si viene por anuncio o inbound genuino)
@@ -592,7 +663,7 @@ async function processIncomingMessage(sock, msg, contextSource = 'live') {
     name: pushName,
     phone,
     displayPhone,
-    service: isFromLidAd ? 'Anuncio Meta Ads WhatsApp' : 'Contacto Inicial WhatsApp',
+    service: hasMetaAdReferral ? 'Anuncio Meta Ads WhatsApp' : 'Contacto Inicial WhatsApp',
     notes: `Mensaje: "${text}"`,
     source: 'whatsapp_auto',
     eventId: capiRes?.eventId || `wa_${phone}_${Date.now()}`
