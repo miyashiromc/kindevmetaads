@@ -9,6 +9,7 @@ import {
   RefreshCw 
 } from 'lucide-react';
 import { Lead } from '../types';
+import { CopyPhoneButton } from './CopyPhoneButton';
 
 interface LtvClientsViewProps {
   leads: Lead[];
@@ -215,9 +216,12 @@ export const LtvClientsView: React.FC<LtvClientsViewProps> = ({ leads }) => {
 
                   {/* Botón de 1 Clic para WhatsApp */}
                   <div className="pt-2 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-                    <span className="font-mono text-xs text-slate-400 truncate">
-                      +{lead.phone}
-                    </span>
+                    <div className="flex items-center gap-1.5">
+                      <span className="font-mono text-xs text-slate-400 truncate">
+                        +{lead.phone}
+                      </span>
+                      <CopyPhoneButton phone={lead.phone} />
+                    </div>
 
                     <a
                       href={`https://wa.me/${lead.phone}?text=${personalizedMsg}`}

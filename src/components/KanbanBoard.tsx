@@ -14,6 +14,7 @@ import {
   X
 } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
+import { CopyPhoneButton } from './CopyPhoneButton';
 
 interface KanbanBoardProps {
   leads: Lead[];
@@ -239,7 +240,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         key={lead.id}
         draggable={!isMobileList && editingLeadId !== lead.id}
         onDragStart={(e) => !isMobileList && handleDragStart(e, lead.id)}
-        className="bg-white rounded-2xl p-4 border border-slate-200/70 shadow-[0_2px_8px_rgba(0,0,0,0.03)] hover:shadow-md hover:border-slate-300 transition-all space-y-3 group cursor-pointer"
+        className="bg-white rounded-xl p-3.5 border border-slate-200/60 hover:border-slate-300 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-md transition-all space-y-2.5 group cursor-pointer"
         onClick={() => onOpenLeadProfile(lead)}
       >
         {/* Encabezado: Nombre, Edición y Monto */}
@@ -286,7 +287,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               </div>
             ) : (
               <div className="flex items-center gap-1.5">
-                <span className="text-sm font-extrabold text-slate-900 group-hover:text-violet-600 transition-colors truncate">
+                <span className="text-xs sm:text-sm font-extrabold text-slate-900 group-hover:text-violet-600 transition-colors truncate">
                   {lead.name}
                 </span>
                 {onUpdateName && (
@@ -296,7 +297,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                       e.stopPropagation();
                       handleStartEditName(lead);
                     }}
-                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors shrink-0"
+                    className="p-1 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-md transition-colors shrink-0 opacity-0 group-hover:opacity-100"
                     title="Modificar nombre rápido"
                   >
                     <Pencil className="w-3 h-3" />
@@ -305,53 +306,54 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               </div>
             )}
 
-            {/* Enlace directo a WhatsApp sin contenedor pesado */}
-            <div className="mt-1">
+            {/* Enlace directo a WhatsApp y botón de copiar */}
+            <div className="mt-0.5 flex items-center gap-1">
               <a
                 href={`https://wa.me/${lead.phone}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={(e) => e.stopPropagation()}
-                className="text-xs font-mono font-bold text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1.5 transition-colors py-0.5 active:scale-95"
+                className="text-xs font-mono font-medium text-emerald-600 hover:text-emerald-700 inline-flex items-center gap-1.5 transition-colors py-0.5"
                 title="Abrir chat en WhatsApp"
               >
-                <Phone className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                <Phone className="w-3 h-3 text-emerald-500 shrink-0" />
                 <span>+{lead.phone}</span>
               </a>
+              <CopyPhoneButton phone={lead.phone} />
             </div>
           </div>
 
-          {/* Monto del Proyecto */}
+          {/* Monto del Proyecto (Limpio, tipográfico, sin caja) */}
           <div className="text-right shrink-0">
-            <span className="font-mono text-sm font-black text-slate-900 bg-slate-100/80 px-2 py-0.5 rounded-lg border border-slate-200/60">
+            <span className="font-mono text-sm font-extrabold text-slate-900 tracking-tight">
               ${Number(lead.amount || 0).toFixed(0)}
             </span>
-            <span className="block text-[10px] text-slate-400 font-sans mt-0.5">USD</span>
+            <span className="text-[10px] text-slate-400 font-sans ml-1">USD</span>
           </div>
         </div>
 
-        {/* Servicio Cotizado y Notas con Jerarquía Tipográfica (Cero Box-in-Box) */}
+        {/* Servicio Cotizado y Notas con Jerarquía Tipográfica */}
         <div className="space-y-1">
-          <p className="text-xs font-semibold text-slate-700 leading-tight">
+          <p className="text-xs text-slate-600 leading-snug line-clamp-1 font-medium">
             {lead.service}
           </p>
           {lead.notes && (
-            <p className="text-[11px] text-slate-500 italic line-clamp-2 border-l-2 border-violet-400/80 pl-2 mt-1">
+            <p className="text-[11px] text-slate-400 italic line-clamp-2 border-l-2 border-violet-300 pl-2 mt-0.5">
               "{lead.notes}"
             </p>
           )}
         </div>
 
-        {/* Controles de Avance Ergonómicos con Touch Targets Amplios */}
+        {/* Controles de Avance Ergonómicos (Sin Box-in-Box) */}
         <div
-          className="pt-2.5 border-t border-slate-100 flex items-center justify-between gap-1.5"
+          className="pt-2 border-t border-slate-100 flex items-center justify-between gap-1.5"
           onClick={(e) => e.stopPropagation()}
         >
           <button
             type="button"
             onClick={() => handleStepMove(lead, 'back')}
             disabled={!hasPrev}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed border border-slate-200/60 text-slate-700 transition-all active:scale-95 shrink-0 touch-manipulation"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-15 disabled:hover:bg-transparent transition-all active:scale-90 shrink-0"
             title="Retroceder etapa"
             aria-label="Retroceder etapa"
           >
@@ -369,7 +371,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   onUpdateStatus(lead.id, 'anticipo');
                 }
               }}
-              className="flex-1 h-10 px-3 rounded-xl bg-violet-600 hover:bg-violet-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation"
+              className="flex-1 h-8 px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
               title="Registrar cobro de anticipo y despachar Purchase a Meta"
             >
               <DollarSign className="w-3.5 h-3.5" />
@@ -386,19 +388,19 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                   onUpdateStatus(lead.id, 'cerrado');
                 }
               }}
-              className="flex-1 h-10 px-3 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs flex items-center justify-center gap-1.5 shadow-sm transition-all active:scale-95 touch-manipulation"
+              className="flex-1 h-8 px-3 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
               title="Marcar proyecto como entregado y cerrado"
             >
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Entregar Proyecto ➔</span>
             </button>
           ) : (
             <button
               type="button"
               onClick={() => onOpenLeadProfile(lead)}
-              className="flex-1 h-10 px-2 rounded-xl text-xs text-slate-600 hover:text-violet-700 hover:bg-slate-100 font-bold transition-all text-center flex items-center justify-center"
+              className="flex-1 h-8 px-2 rounded-lg text-xs text-slate-500 hover:text-slate-800 hover:bg-slate-100 font-semibold transition-all text-center flex items-center justify-center"
             >
-              Ver Ficha Detallada
+              Ver Ficha
             </button>
           )}
 
@@ -406,7 +408,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             type="button"
             onClick={() => handleStepMove(lead, 'forward')}
             disabled={!hasNext}
-            className="w-10 h-10 flex items-center justify-center rounded-xl bg-slate-100 hover:bg-slate-200 disabled:opacity-20 disabled:cursor-not-allowed border border-slate-200/60 text-slate-700 transition-all active:scale-95 shrink-0 touch-manipulation"
+            className="w-8 h-8 flex items-center justify-center rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 disabled:opacity-15 disabled:hover:bg-transparent transition-all active:scale-90 shrink-0"
             title="Avanzar etapa"
             aria-label="Avanzar etapa"
           >
@@ -423,51 +425,46 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
 
   return (
     <div className="space-y-4 w-full">
-      {/* Barra de Control y Filtros del Kanban (Diseño Abierto y Sin Box-in-Box) */}
-      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 bg-white/80 backdrop-blur-md p-3.5 sm:p-4 rounded-2xl border border-slate-200/70 shadow-xs">
+      {/* Barra Superior del Kanban (Diseño Abierto, Sin Box-in-Box) */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-1 pb-2">
         
         {/* Título & Métricas Rápidas */}
         <div className="flex flex-wrap items-center gap-3">
-          <div>
-            <div className="flex items-center gap-2">
-              <h2 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                Tablero Visual de Ventas (Pipeline Kanban)
-              </h2>
-              <span className="text-xs font-bold px-2.5 py-0.5 rounded-full bg-violet-100 text-violet-800 border border-violet-200/80">
-                {leads.length} clientes
-              </span>
-            </div>
-            <p className="text-xs text-slate-500 mt-0.5 hidden sm:block">
-              Arrastra las tarjetas libremente o pulsa las flechas para avanzar etapas comerciales.
-            </p>
+          <div className="flex items-center gap-2">
+            <h2 className="text-base sm:text-lg font-black text-slate-900 tracking-tight">
+              Pipeline Kanban
+            </h2>
+            <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-slate-200/70 text-slate-700">
+              {leads.length} clientes
+            </span>
           </div>
 
-          {/* Píldoras de Facturación Rápida */}
-          <div className="hidden xl:flex items-center gap-2 pl-3 border-l border-slate-200">
-            <div className="px-3 py-1 rounded-xl bg-emerald-50 border border-emerald-200/80 text-emerald-900 text-xs font-semibold flex items-center gap-1.5">
+          {/* Facturación Inline (Tipográfica y Limpia) */}
+          <div className="hidden md:flex items-center gap-4 pl-3 border-l border-slate-200 text-xs">
+            <div className="flex items-center gap-1.5 text-slate-500">
               <DollarSign className="w-3.5 h-3.5 text-emerald-600" />
-              <span>Cerrado: <strong className="font-mono font-bold">${pipelineMetrics.closedTotal.toFixed(0)} USD</strong></span>
+              <span>Cerrado: <strong className="font-mono text-emerald-700 font-bold">${pipelineMetrics.closedTotal.toFixed(0)} USD</strong></span>
             </div>
 
             {pipelineMetrics.pipelineTotal > 0 && (
-              <div className="px-3 py-1 rounded-xl bg-amber-50 border border-amber-200/80 text-amber-900 text-xs font-semibold flex items-center gap-1.5">
-                <span>En Proceso: <strong className="font-mono font-bold">${pipelineMetrics.pipelineTotal.toFixed(0)} USD</strong></span>
+              <div className="flex items-center gap-1.5 text-slate-500">
+                <span>En Proceso: <strong className="font-mono text-amber-700 font-bold">${pipelineMetrics.pipelineTotal.toFixed(0)} USD</strong></span>
               </div>
             )}
           </div>
         </div>
 
-        {/* Buscador y Acciones */}
+        {/* Buscador y Controles de Vista */}
         <div className="flex items-center gap-2">
           {/* Buscador dentro del Kanban */}
-          <div className="relative flex-1 sm:w-64">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <div className="relative flex-1 sm:w-60">
+            <Search className="w-3.5 h-3.5 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
             <input
               type="text"
               value={searchFilter}
               onChange={(e) => setSearchFilter(e.target.value)}
               placeholder="Buscar cliente o teléfono..."
-              className="w-full pl-9 pr-8 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 transition-all"
+              className="w-full pl-8 pr-7 py-2 bg-white border border-slate-200/80 rounded-xl text-xs font-medium text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-slate-900/10 focus:border-slate-400 transition-all shadow-2xs"
             />
             {searchFilter && (
               <button
@@ -485,12 +482,12 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             <button
               type="button"
               onClick={onToggleSidebarCollapse}
-              className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs transition-all border border-slate-200 shrink-0"
+              className="hidden lg:flex items-center gap-1.5 px-3 py-2 rounded-xl bg-white hover:bg-slate-50 text-slate-700 font-bold text-xs transition-all border border-slate-200/80 shadow-2xs shrink-0"
               title={isSidebarCollapsed ? "Expandir barra lateral" : "Colapsar barra lateral para pantalla completa"}
             >
               {isSidebarCollapsed ? (
                 <>
-                  <Minimize2 className="w-3.5 h-3.5 text-slate-600" />
+                  <Minimize2 className="w-3.5 h-3.5 text-slate-500" />
                   <span>Normal</span>
                 </>
               ) : (
@@ -508,8 +505,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             onClick={onAddNewLead}
             className="flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-900 hover:bg-slate-800 text-white font-bold text-xs transition-all shadow-sm active:scale-95 shrink-0"
           >
-            <PlusCircle className="w-4 h-4 text-violet-400" />
-            <span className="hidden sm:inline">Nuevo Contacto</span>
+            <PlusCircle className="w-3.5 h-3.5 text-violet-400" />
+            <span className="hidden sm:inline">Nuevo Lead</span>
             <span className="sm:hidden font-bold">Nuevo</span>
           </button>
         </div>
@@ -610,44 +607,42 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               onDragOver={(e) => handleDragOver(e, col.status)}
               onDragLeave={handleDragLeave}
               onDrop={(e) => handleDrop(e, col.status)}
-              className={`rounded-2xl border bg-slate-100/60 p-3 sm:p-3.5 flex flex-col sm:flex-1 sm:min-w-[280px] xl:min-w-[270px] 2xl:min-w-0 transition-all h-[calc(100vh-215px)] min-h-[560px] ${
+              className={`rounded-2xl border p-3 flex flex-col sm:flex-1 sm:min-w-[280px] xl:min-w-[270px] 2xl:min-w-0 transition-all h-[calc(100vh-190px)] min-h-[560px] ${
                 isDropTarget
-                  ? 'border-violet-500 bg-violet-50/70 ring-2 ring-violet-500/20 shadow-md'
-                  : 'border-slate-200/70 shadow-xs'
+                  ? 'border-violet-400 bg-violet-50/50 ring-2 ring-violet-500/20'
+                  : 'border-slate-200/50 bg-slate-100/40'
               }`}
             >
               {/* Encabezado Fijo de Columna */}
-              <div className="pb-3 mb-2 border-b border-slate-200/70 shrink-0">
-                <div className="flex items-center justify-between mb-1.5">
+              <div className="pb-2.5 mb-2 border-b border-slate-200/40 shrink-0">
+                <div className="flex items-center justify-between mb-1">
                   <div className="flex items-center gap-2 min-w-0">
-                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${col.dotColor}`} />
+                    <span className={`w-2 h-2 rounded-full shrink-0 ${col.dotColor}`} />
                     <h3 className="font-extrabold text-xs text-slate-900 tracking-tight truncate">
                       {col.title}
                     </h3>
                   </div>
-                  <div className="flex items-center gap-1.5 shrink-0">
-                    <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-white text-slate-700 border border-slate-200/70 shadow-2xs">
-                      {colLeads.length}
-                    </span>
-                  </div>
+                  <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-slate-200/70 text-slate-700">
+                    {colLeads.length}
+                  </span>
                 </div>
 
-                <div className="flex items-center justify-between text-[11px] text-slate-500">
+                <div className="flex items-center justify-between text-[11px] text-slate-400">
                   <span className="truncate pr-1">{col.description}</span>
                   {colTotal > 0 && (
-                    <span className="font-mono font-bold text-slate-800 bg-white/80 px-1.5 py-0.5 rounded border border-slate-200 shrink-0 shadow-2xs">
-                      ${colTotal.toFixed(0)}
+                    <span className="font-mono font-bold text-slate-700 shrink-0">
+                      ${colTotal.toFixed(0)} USD
                     </span>
                   )}
                 </div>
               </div>
 
               {/* Área de Tarjetas con Scroll Vertical */}
-              <div className="space-y-2.5 flex-1 overflow-y-auto pr-1 mt-1 -mr-1">
+              <div className="space-y-2 flex-1 overflow-y-auto pr-1 mt-1 -mr-1">
                 {colLeads.length === 0 ? (
-                  <div className="h-36 flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-200 rounded-2xl text-slate-400 bg-white/40">
-                    <p className="text-xs font-semibold text-slate-600">Sin clientes en esta fase</p>
-                    <p className="text-[11px] text-slate-400 mt-1">Arrastra una tarjeta o usa las flechas</p>
+                  <div className="h-32 flex flex-col items-center justify-center text-center p-4 border border-dashed border-slate-200/60 rounded-xl text-slate-400 bg-white/30">
+                    <p className="text-xs font-medium text-slate-500">Sin clientes en esta fase</p>
+                    <p className="text-[11px] text-slate-400 mt-0.5">Arrastra una tarjeta aquí</p>
                   </div>
                 ) : (
                   colLeads.map((lead) => renderKanbanCard(lead, false))

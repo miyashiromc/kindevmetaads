@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { MessageCircle, DollarSign, Trash2, CheckCircle, Clock, User, XCircle, Edit3, Pencil, Check, X } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
+import { CopyPhoneButton } from './CopyPhoneButton';
 
 interface LeadCardProps {
   lead: Lead;
@@ -39,35 +40,35 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
     switch (lead.status) {
       case 'cerrado':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700">
             <CheckCircle className="w-3.5 h-3.5 text-emerald-600" />
             Cerrado (${Number(lead.amount).toFixed(2)})
           </span>
         );
       case 'anticipo':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold bg-violet-50 text-violet-700 border border-violet-200">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-bold bg-violet-50 text-violet-700">
             <Clock className="w-3.5 h-3.5 text-violet-600" />
             Pagó Anticipo (${Number(lead.amount).toFixed(2)})
           </span>
         );
       case 'cotizado':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-blue-50 text-blue-700 border border-blue-200">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-blue-50 text-blue-700">
             <Clock className="w-3.5 h-3.5 text-blue-600" />
             Cotizado {lead.amount > 0 ? `($${Number(lead.amount).toFixed(2)})` : ''}
           </span>
         );
       case 'descartado':
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-rose-50 text-rose-700 border border-rose-200">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-rose-50 text-rose-700">
             <XCircle className="w-3.5 h-3.5 text-rose-600" />
             Descartado
           </span>
         );
       default:
         return (
-          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200">
+          <span className="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 text-slate-700">
             <User className="w-3.5 h-3.5 text-slate-500" />
             Prospecto {lead.amount > 0 ? `($${Number(lead.amount).toFixed(2)})` : ''}
           </span>
@@ -82,7 +83,7 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
   };
 
   return (
-    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/70 hover:border-slate-300 shadow-[0_2px_8px_rgba(0,0,0,0.02)] hover:shadow-md transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
+    <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/60 hover:border-slate-300 shadow-[0_1px_3px_rgba(0,0,0,0.02)] hover:shadow-xs transition-all flex flex-col md:flex-row md:items-center justify-between gap-4">
       
       {/* Datos del Cliente */}
       <div className="space-y-2 flex-1">
@@ -163,17 +164,20 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
         </div>
 
         {/* Metadatos en Línea Limpia (Cero Cajas Recargadas) */}
-        <div className="flex items-center gap-2.5 text-xs text-slate-500 flex-wrap">
-          <a
-            href={waLink}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1.5 transition-colors active:scale-95 py-0.5"
-            title="Abrir WhatsApp Web"
-          >
-            <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
-            <span>+{lead.phone}</span>
-          </a>
+        <div className="flex items-center gap-2 text-xs text-slate-500 flex-wrap">
+          <div className="flex items-center gap-1">
+            <a
+              href={waLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono font-bold text-emerald-700 hover:text-emerald-800 flex items-center gap-1.5 transition-colors active:scale-95 py-0.5"
+              title="Abrir WhatsApp Web"
+            >
+              <MessageCircle className="w-3.5 h-3.5 text-emerald-600" />
+              <span>+{lead.phone}</span>
+            </a>
+            <CopyPhoneButton phone={lead.phone} />
+          </div>
           <span className="text-slate-300">•</span>
           <span className="text-slate-700 font-medium">{lead.service}</span>
           <span className="text-slate-300">•</span>

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { X, CheckCircle2, Send, Loader2, Sparkles, Plus, Minus } from 'lucide-react';
 import { Lead } from '../types';
 import { KINDEV_PRESETS } from '../lib/presets';
+import { CopyPhoneButton } from './CopyPhoneButton';
 
 interface SaleModalProps {
   lead: Lead | null;
@@ -93,9 +94,10 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, targetStatus = 'cerr
               ? 'Cliente asegurado. El evento Purchase se despachará de inmediato para acelerar el entrenamiento del algoritmo.' 
               : 'El proyecto se marcará como cerrado y el evento Purchase se despachará a Meta CAPI.'}
           </p>
-          <p className="text-xs text-slate-600 mt-1.5 font-semibold">
-            Cliente: <span className="font-bold text-slate-900">{lead.name}</span> (+<span className="font-mono text-slate-700">{lead.phone}</span>)
-          </p>
+          <div className="flex items-center gap-1.5 text-xs text-slate-600 mt-1.5 font-semibold">
+            <span>Cliente: <span className="font-bold text-slate-900">{lead.name}</span> (+<span className="font-mono text-slate-700">{lead.phone}</span>)</span>
+            <CopyPhoneButton phone={lead.phone} />
+          </div>
         </div>
 
         {/* Campo de Precio Personalizado Principal */}

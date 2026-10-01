@@ -10,6 +10,8 @@ import {
   HelpCircle
 } from 'lucide-react';
 import { SystemApisStatus } from '../types';
+import { doc, setDoc } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 
 interface MetaTokenModalProps {
   isOpen: boolean;
@@ -47,30 +49,61 @@ export const MetaTokenModal: React.FC<MetaTokenModalProps> = ({
 
   const handleSaveToken = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!tokenInput.trim()) {
+    const cleanToken = tokenInput.trim();
+    if (!cleanToken) {
       onShowToast('Ingresa un token válido de Meta', 'error');
       return;
     }
 
     setIsSubmitting(true);
     try {
-      const res = await fetch('/api/meta/update-token', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token: tokenInput.trim(), type: 'user' })
-      });
+      // 1. Validar directamente contra Meta Graph API
+      const testRes = await fetch(`https://graph.facebook.com/v21.0/me?access_token=${cleanToken}`);
+      const testData = await testRes.json();
 
-      const data = await res.json();
-      if (res.ok && data.success) {
-        onShowToast(`¡Token verificado con éxito! Conectado como: ${data.user || 'Meta Admin'}`, 'success');
-        setTokenInput('');
-        if (onTokenUpdated) onTokenUpdated();
-        setTimeout(() => onClose(), 1200);
-      } else {
-        onShowToast(data.error || 'Token inválido o rechazado por Meta', 'error');
+      if (testData.error) {
+        onShowToast(testData.error.message || 'Token inválido o expirado devuelto por Meta', 'error');
+        return;
       }
+
+      // 2. Guardar en localStorage para disponibilidad instantánea en la app
+      localStorage.setItem('kindev_meta_token', cleanToken);
+      localStorage.setItem('kindev_meta_user_token', cleanToken);
+
+      // 3. Sincronizar en Cloud Firestore para persistencia global en la nube
+      try {
+        await setDoc(doc(db, 'settings', 'meta_config'), {
+          testMode: false,
+          userToken: cleanToken,
+          tokenUser: testData.name || 'Meta Admin',
+          tokenUserId: testData.id || '',
+          updatedAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (firestoreErr) {
+        console.warn('Advertencia guardando en Firestore:', firestoreErr);
+      }
+
+      // 4. Intentar sincronizar con servidor backend local si está alcanzable
+      try {
+        await fetch('/api/meta/update-token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token: cleanToken, type: 'user' }),
+          signal: AbortSignal.timeout(3000)
+        });
+      } catch {
+        // Backend local opcional en producción estática
+      }
+
+      onShowToast(`¡Token verificado con éxito! Conectado como: ${testData.name || 'Meta Admin'}`, 'success');
+      setTokenInput('');
+      if (onTokenUpdated) onTokenUpdated();
+      setTimeout(() => {
+        onClose();
+        window.location.reload();
+      }, 1200);
     } catch (err: any) {
-      onShowToast(`Error de conexión: ${err.message}`, 'error');
+      onShowToast(`Error de conexión con Meta: ${err.message}`, 'error');
     } finally {
       setIsSubmitting(false);
     }

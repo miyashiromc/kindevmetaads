@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { X, MessageSquare, AlertCircle, RefreshCw, QrCode, ExternalLink, ShieldCheck, Terminal } from 'lucide-react';
 import { WhatsAppBotStatus } from '../types';
+import { CopyPhoneButton } from './CopyPhoneButton';
 
 interface WhatsAppStatusModalProps {
   isOpen: boolean;
@@ -131,9 +132,14 @@ export const WhatsAppStatusModal: React.FC<WhatsAppStatusModalProps> = ({
           <div className="bg-slate-50 rounded-2xl p-4 border border-slate-200/80 space-y-3 text-xs">
             <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
               <span className="text-slate-500 font-medium">Línea Vinculada:</span>
-              <span className="font-mono font-bold text-slate-800">
-                {status.user ? `+${status.user}` : (isConnected ? '+593 99 195 2889' : 'No conectado')}
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="font-mono font-bold text-slate-800">
+                  {status.user ? `+${status.user}` : (isConnected ? '+593 99 195 2889' : 'No conectado')}
+                </span>
+                {(status.user || isConnected) && (
+                  <CopyPhoneButton phone={status.user || '593991952889'} />
+                )}
+              </div>
             </div>
 
             <div className="flex items-center justify-between py-1 border-b border-slate-200/60">

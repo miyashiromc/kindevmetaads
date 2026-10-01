@@ -1,7 +1,7 @@
 import { getFbc, getFbp, generateEventId } from './meta-tracker';
 
 export const META_DATASET_ID = '1368429478371391';
-const DEFAULT_TOKEN = 'EAAPkgvHBCxEBSoXtA0OwkEVoNIaZCjVsz77WQxWTsbo9cTMRCuhDIO6cF5Fe40fPi4jxrRF0nfFFSLumbTfumZCPGq4hO1C6KwldQESlPPUdqyZA5Dc6SLZCRVL2QY9ZB9aybQ0xTlYWrimR7lxQqGXFig1Qrb5lBv1ZCZCZCA24e4eotiELUVuvwIzJuYMyXAZDZD';
+const DEFAULT_TOKEN = 'EAATePFDZC1BEBSsI4ZCoUtYqqCZBYhyrqRW7tqukCjNcLrHUEF1CHrIS4uQlwIZCV0r6SZApOAWmRqH2si0cjplyis3590nb1aHqnTUZCsMpshlZBbeZAUypVHSTJljtuIJVh2ZCBPPiTq8ooKGeTxOOa7C7urf2pUskFPARZByIwu53uWRwlUb4OUERuWFaoqTdv2hmXuqFvpf0PT10H02oHmGzavbO10rjZCAYkAcRoIjNsHHoKSOS1nh4xHI12XBkKn5oS7LMh8tGRINaOanGHay9ZA7doYxYbqY47AZDZD';
 
 export function getStoredMetaToken(): string {
   if (typeof window === 'undefined') return DEFAULT_TOKEN;

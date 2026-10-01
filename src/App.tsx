@@ -29,7 +29,7 @@ import { StatsGrid } from './components/StatsGrid';
 import { LeadForm } from './components/LeadForm';
 import { LeadCard } from './components/LeadCard';
 import { SaleModal } from './components/SaleModal';
-import { LeadProfileModal } from './components/LeadProfileModal';
+import { LeadProfileView } from './components/LeadProfileView';
 import { ConfigModal } from './components/ConfigModal';
 import { WhatsAppStatusModal } from './components/WhatsAppStatusModal';
 import { MetaTokenModal } from './components/MetaTokenModal';
@@ -812,6 +812,17 @@ export const App: React.FC = () => {
       localStorage.setItem('kindev_meta_config', JSON.stringify(newConfig));
       if (newToken) {
         localStorage.setItem('kindev_meta_token', newToken);
+        localStorage.setItem('kindev_meta_user_token', newToken);
+        try {
+          await setDoc(doc(db, 'settings', 'meta_config'), {
+            testMode: newConfig.testMode,
+            testEventCode: newConfig.testEventCode || '',
+            userToken: newToken,
+            updatedAt: new Date().toISOString()
+          }, { merge: true });
+        } catch {
+          // ignore
+        }
       }
     } else {
       const updatedClient: ClientAccount = {
@@ -825,7 +836,12 @@ export const App: React.FC = () => {
       };
       await handleSaveClient(updatedClient);
     }
-    showToast('Configuración guardada exitosamente', 'success');
+    showToast('Configuración guardada exitosamente. Actualizando...', 'success');
+    if (newToken) {
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    }
   };
 
   const handleSaveClient = async (clientToSave: ClientAccount) => {
@@ -899,7 +915,7 @@ export const App: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen bg-slate-100/70 text-slate-900 flex font-sans antialiased selection:bg-violet-100 selection:text-violet-900">
+    <div className="min-h-screen bg-[#f8fafc] text-slate-900 flex font-sans antialiased selection:bg-violet-100 selection:text-violet-900">
       
       {/* 1. Barra Lateral Izquierda (Sidebar Empresarial) */}
       <Sidebar
@@ -946,12 +962,8 @@ export const App: React.FC = () => {
           onOpenClientManager={() => setIsClientManagerOpen(true)}
         />
 
-        {/* Contenedor Principal con Espacio Seguro para Barra Inferior en Celular */}
-        <main className={`flex-1 w-full transition-all pb-24 lg:pb-8 ${
-          activeTab === 'kanban'
-            ? 'p-2.5 sm:p-4 md:p-6 max-w-none space-y-3 sm:space-y-4'
-            : 'p-3 sm:p-5 md:p-6 lg:p-8 max-w-7xl mx-auto space-y-4 sm:space-y-6'
-        }`}>
+        {/* Contenedor Principal Ergonómico para PC y Móvil */}
+        <main className="flex-1 w-full transition-all pb-24 lg:pb-8 px-4 sm:px-6 lg:px-8 py-5 max-w-[1600px] mx-auto space-y-5">
           
           {/* Banner informativo de modo prueba si está activo */}
           {Boolean(activeTenant.metaConfig?.testMode ?? config.testMode) && (
@@ -975,8 +987,23 @@ export const App: React.FC = () => {
             </div>
           )}
 
-        {/* 1. Módulo: Pipeline Kanban */}
-        {activeTab === 'kanban' && (
+          {/* VISTA DE PÁGINA COMPLETA: Perfil Detallado del Cliente (Reemplaza a la ventana emergente) */}
+          {profileLead ? (
+            <LeadProfileView
+              lead={profileLead}
+              onBack={() => setProfileLead(null)}
+              onSaveLead={handleSaveLeadProfile}
+              onDeleteLead={handleDelete}
+              onOpenSaleModal={(l, targetStatus) => {
+                setProfileLead(null);
+                setSaleLead(l);
+                if (targetStatus) setSaleTargetStatus(targetStatus);
+              }}
+            />
+          ) : (
+            <>
+              {/* 1. Módulo: Pipeline Kanban */}
+              {activeTab === 'kanban' && (
           <KanbanBoard
             leads={tenantLeads}
             onUpdateStatus={handleUpdateStatus}
@@ -1174,12 +1201,14 @@ export const App: React.FC = () => {
           </section>
         </div>
       )}
+            </>
+          )}
 
         </main>
 
         {/* Footer Empresarial Luminous */}
-        <footer className="border-t border-slate-200/80 bg-white py-3.5 px-4 sm:px-6 mt-auto mb-14 lg:mb-0">
-          <div className={`${activeTab === 'kanban' ? 'w-full px-2' : 'max-w-7xl mx-auto'} flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2`}>
+        <footer className="border-t border-slate-200/80 bg-white py-3.5 px-4 sm:px-6 lg:px-8 mt-auto mb-14 lg:mb-0">
+          <div className="max-w-[1600px] mx-auto w-full flex flex-col sm:flex-row items-center justify-between text-xs text-slate-500 gap-2">
             <div className="flex items-center gap-2">
               <img src="/logo.png" alt="Kindev Logo" className="h-4 w-auto object-contain opacity-70" />
               <span>© 2026 Kindev S.A.S. • Conversions API Engine v2.0 Enterprise</span>
@@ -1223,19 +1252,6 @@ export const App: React.FC = () => {
         onConfirmSale={handleConfirmSale}
       />
 
-      {/* Modal de Perfil Completo del Cliente */}
-      <LeadProfileModal
-        lead={profileLead}
-        isOpen={Boolean(profileLead)}
-        onClose={() => setProfileLead(null)}
-        onSaveLead={handleSaveLeadProfile}
-        onDeleteLead={handleDelete}
-        onOpenSaleModal={(l, targetStatus) => {
-          setProfileLead(null);
-          setSaleLead(l);
-          if (targetStatus) setSaleTargetStatus(targetStatus);
-        }}
-      />
 
       {/* Modal de Configuración y Seguridad */}
       <ConfigModal

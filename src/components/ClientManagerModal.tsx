@@ -11,6 +11,7 @@ import {
   Database
 } from 'lucide-react';
 import { ClientAccount } from '../types';
+import { CopyPhoneButton } from './CopyPhoneButton';
 
 interface ClientManagerModalProps {
   isOpen: boolean;
@@ -263,7 +264,12 @@ export const ClientManagerModal: React.FC<ClientManagerModalProps> = ({
                               </div>
                               <div className="flex items-center gap-2 text-[11px] text-slate-500 font-mono">
                                 <span>Dataset: {client.metaConfig?.datasetId || 'Sin Dataset'}</span>
-                                {client.phone && <span>• Tel: {client.phone}</span>}
+                                {client.phone && (
+                                  <span className="inline-flex items-center gap-1">
+                                    <span>• Tel: {client.phone}</span>
+                                    <CopyPhoneButton phone={client.phone} iconClassName="w-3 h-3" />
+                                  </span>
+                                )}
                               </div>
                             </div>
                           </div>

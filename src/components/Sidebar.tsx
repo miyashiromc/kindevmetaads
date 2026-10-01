@@ -10,8 +10,6 @@ import {
   Lock, 
   Settings, 
   MessageSquare, 
-  Database, 
-  Radio, 
   X, 
   ChevronRight,
   PanelLeftClose,
@@ -20,6 +18,7 @@ import {
 } from 'lucide-react';
 import { TabView, MetaConfig, WhatsAppBotStatus, UserRole } from '../types';
 import { META_DATASET_ID } from '../lib/meta-capi';
+import { CopyPhoneButton } from './CopyPhoneButton';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -241,7 +240,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
 
                 <div className="text-[11px] text-slate-400 truncate pl-4">
                   {isWsConnected ? (
-                    <span>Línea: <strong className="text-emerald-400 font-mono">+{wsStatus.user || '593991952889'}</strong></span>
+                    <span className="inline-flex items-center gap-1.5">
+                      <span>Línea: <strong className="text-emerald-400 font-mono">+{wsStatus.user || '593991952889'}</strong></span>
+                      <CopyPhoneButton 
+                        phone={wsStatus.user || '593991952889'} 
+                        className="text-slate-400 hover:text-white hover:bg-slate-800 p-0.5" 
+                        iconClassName="w-3 h-3" 
+                      />
+                    </span>
                   ) : wsStatus.status === 'qr_ready' ? (
                     <span className="text-amber-400">Toca para abrir código QR</span>
                   ) : (
@@ -337,49 +343,49 @@ export const Sidebar: React.FC<SidebarProps> = ({
           </div>
         )}
 
-        {/* Estado del Entorno e Infraestructura (Solo en vista expandida) */}
+        {/* Estado del Entorno e Infraestructura */}
         {!isCollapsed ? (
-          <div className="p-4 mx-3 mb-3 rounded-2xl bg-slate-800/40 border border-slate-800 text-[11px] space-y-2">
+          <div className="px-5 py-3 text-[11px] space-y-1.5 border-t border-slate-800/50">
             <div className="flex items-center justify-between text-slate-400">
               <span className="flex items-center gap-1.5">
-                <Database className="w-3.5 h-3.5 text-emerald-400" />
-                <span>Cloud Firestore:</span>
+                <span className={`w-1.5 h-1.5 rounded-full ${firestoreConnected ? 'bg-emerald-400' : 'bg-amber-400'}`} />
+                <span>Firestore CRM:</span>
               </span>
-              <span className="font-bold text-slate-200">
+              <span className="font-semibold text-slate-300">
                 {firestoreConnected ? 'En línea' : 'Local'}
               </span>
             </div>
 
             <div className="flex items-center justify-between text-slate-400">
               <span className="flex items-center gap-1.5">
-                <Radio className="w-3.5 h-3.5 text-violet-400" />
-                <span>Dataset CAPI:</span>
+                <span className="w-1.5 h-1.5 rounded-full bg-violet-400" />
+                <span>Meta CAPI:</span>
               </span>
-              <span className="font-mono font-bold text-slate-300 text-[10px]">
+              <span className="font-mono text-slate-400 text-[10px]">
                 {META_DATASET_ID.slice(0, 6)}...
               </span>
             </div>
           </div>
         ) : (
-          <div className="py-2 flex flex-col items-center gap-2 border-t border-slate-800">
-            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" title="Firestore En línea" />
-            <span className="w-2.5 h-2.5 rounded-full bg-violet-500" title="Meta CAPI Conectado" />
+          <div className="py-2 flex flex-col items-center gap-2 border-t border-slate-800/50">
+            <span className="w-2 h-2 rounded-full bg-emerald-500" title="Firestore En línea" />
+            <span className="w-2 h-2 rounded-full bg-violet-500" title="Meta CAPI Conectado" />
           </div>
         )}
 
         {/* Barra Inferior del Sidebar (Configuraciones y Perfil) */}
-        <div className={`border-t border-slate-800/80 bg-slate-900/90 flex items-center transition-all ${
-          isCollapsed ? 'p-2 flex-col gap-2 justify-center' : 'p-4 justify-between gap-2'
+        <div className={`border-t border-slate-800/60 flex items-center transition-all ${
+          isCollapsed ? 'p-2 flex-col gap-1.5 justify-center' : 'px-4 py-3 justify-between gap-2'
         }`}>
           {!isCollapsed ? (
             <>
               <button
                 type="button"
                 onClick={onOpenConfig}
-                className={`flex-1 py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-semibold transition-all flex items-center justify-center gap-1.5 ${
                   config.testMode
-                    ? 'bg-amber-950/40 text-amber-300 border-amber-500/40 hover:bg-amber-900/50'
-                    : 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700'
+                    ? 'bg-amber-500/10 text-amber-300 hover:bg-amber-500/20'
+                    : 'bg-slate-800/60 hover:bg-slate-800 text-slate-300'
                 }`}
                 title="Configuración de Meta y Tokens"
               >
@@ -390,7 +396,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={onOpenConfig}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-400 hover:text-white border border-slate-700 transition-all shrink-0"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all shrink-0"
                 title="Ajustes y Parámetros"
               >
                 <Settings className="w-4 h-4" />
@@ -399,7 +405,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={onLock}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 border border-slate-700 hover:border-rose-500/40 transition-all shrink-0"
+                className="p-1.5 rounded-lg text-slate-400 hover:text-rose-300 hover:bg-rose-950/40 transition-all shrink-0"
                 title="Bloquear sesión"
               >
                 <Lock className="w-4 h-4" />
@@ -410,7 +416,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={onOpenConfig}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white border border-slate-700 transition-all"
+                className="p-2 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-all"
                 title="Ajustes y Configuración"
               >
                 <Settings className="w-4 h-4" />
@@ -418,7 +424,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
               <button
                 type="button"
                 onClick={onLock}
-                className="p-2 rounded-xl bg-slate-800 hover:bg-rose-950/50 text-slate-400 hover:text-rose-300 border border-slate-700 transition-all"
+                className="p-2 rounded-lg text-slate-400 hover:text-rose-300 hover:bg-rose-950/40 transition-all"
                 title="Bloquear sesión"
               >
                 <Lock className="w-4 h-4" />

@@ -9,6 +9,7 @@ import {
   Phone
 } from 'lucide-react';
 import { Lead } from '../types';
+import { CopyPhoneButton } from './CopyPhoneButton';
 
 interface FollowUpCenterProps {
   leads: Lead[];
@@ -193,15 +194,18 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                   <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
                     <span>{selectedLead.service}</span>
                     <span>•</span>
-                    <a
-                      href={`https://wa.me/${selectedLead.phone}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="font-mono text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
-                    >
-                      <Phone className="w-3.5 h-3.5" />
-                      +{selectedLead.phone}
-                    </a>
+                    <div className="inline-flex items-center gap-1">
+                      <a
+                        href={`https://wa.me/${selectedLead.phone}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="font-mono text-emerald-600 font-bold hover:underline inline-flex items-center gap-1"
+                      >
+                        <Phone className="w-3.5 h-3.5" />
+                        +{selectedLead.phone}
+                      </a>
+                      <CopyPhoneButton phone={selectedLead.phone} />
+                    </div>
                   </div>
                 </div>
 
