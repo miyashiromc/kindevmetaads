@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { 
   MessageCircle, 
   CheckCircle, 
@@ -6,7 +6,9 @@ import {
   Sparkles, 
   ExternalLink,
   ChevronRight,
-  Phone
+  Phone,
+  Clock,
+  MessageSquare
 } from 'lucide-react';
 import { Lead } from '../types';
 import { CopyPhoneButton } from './CopyPhoneButton';
@@ -18,9 +20,15 @@ interface FollowUpCenterProps {
 
 export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNote }) => {
   // Filtramos prospectos, cotizados y anticipos
-  const pendingLeads = leads.filter(
-    (l) => l.status === 'prospecto' || l.status === 'cotizado' || l.status === 'anticipo'
-  );
+  const pendingLeads = useMemo(() => {
+    return leads
+      .filter((l) => l.status === 'prospecto' || l.status === 'cotizado' || l.status === 'anticipo')
+      .sort((a, b) => {
+        const timeA = new Date(a.lastContactDate || a.createdAt).getTime();
+        const timeB = new Date(b.lastContactDate || b.createdAt).getTime();
+        return timeB - timeA;
+      });
+  }, [leads]);
 
   const [selectedLeadId, setSelectedLeadId] = useState<string>(
     pendingLeads[0]?.id || ''
@@ -30,12 +38,63 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
 
   const selectedLead = pendingLeads.find((l) => l.id === selectedLeadId) || pendingLeads[0];
 
-  // Calcular horas desde el último contacto o registro
-  const getHoursSinceContact = (dateStr: string) => {
-    const d = new Date(dateStr).getTime();
+  // Calcular tiempo relativo e indicador inteligente de conversación
+  const getContactActivity = (lead: Lead) => {
+    const rawDate = lead.lastContactDate || lead.createdAt;
+    const d = new Date(rawDate).getTime();
     const now = Date.now();
-    const diffHours = Math.floor((now - d) / (1000 * 60 * 60));
-    return diffHours;
+    const diffMs = Math.max(0, now - d);
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffDays = Math.floor(diffHours / 24);
+
+    const hasNewMessage = (lead.notes || '').includes('[Nuevo mensaje WhatsApp');
+
+    if (diffMins < 60) {
+      return {
+        text: diffMins <= 1 ? 'Hace un momento' : `Hace ${diffMins}m`,
+        color: 'bg-emerald-50 text-emerald-800 border-emerald-300 font-extrabold',
+        hasNewMessage,
+        isHot: true
+      };
+    }
+    if (diffHours < 24) {
+      return {
+        text: `Hace ${diffHours}h`,
+        color: 'bg-emerald-50 text-emerald-800 border-emerald-200/80 font-bold',
+        hasNewMessage,
+        isHot: false
+      };
+    }
+    if (diffHours < 48) {
+      return {
+        text: 'Ayer / 24h',
+        color: 'bg-amber-50 text-amber-900 border-amber-200/80',
+        hasNewMessage,
+        isHot: false
+      };
+    }
+    return {
+      text: `+${diffDays}d inactivo`,
+      color: 'bg-rose-50 text-rose-800 border-rose-200/60',
+      hasNewMessage,
+      isHot: false
+    };
+  };
+
+  // Extraer el texto del último mensaje recibido de WhatsApp si existe
+  const extractLatestMessage = (notes?: string) => {
+    if (!notes) return null;
+    const lines = notes.split('\n').filter(Boolean);
+    const lastLine = lines[lines.length - 1];
+    if (lastLine && lastLine.includes('[Nuevo mensaje WhatsApp')) {
+      const match = lastLine.match(/\[Nuevo mensaje WhatsApp.*?\]:\s*"?([^"]*)"?/);
+      return match ? match[1] : lastLine;
+    }
+    if (lastLine && lastLine.startsWith('Mensaje:')) {
+      return lastLine.replace(/^Mensaje:\s*"?/, '').replace(/"?$/, '');
+    }
+    return null;
   };
 
   // Plantillas oficiales Kindev para seguimiento de ventas
@@ -105,6 +164,7 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
             <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pb-1">
               {pendingLeads.map((lead) => {
                 const isSelected = (selectedLead?.id === lead.id);
+                const activity = getContactActivity(lead);
                 return (
                   <button
                     key={lead.id}
@@ -117,10 +177,8 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                     }`}
                   >
                     <span>{lead.name}</span>
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
-                      isSelected ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'
-                    }`}>
-                      +{lead.phone.slice(-4)}
+                    <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono border ${activity.color}`}>
+                      {activity.text}
                     </span>
                   </button>
                 );
@@ -130,21 +188,16 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
 
           {/* Columna Izquierda: Lista de Clientes en Escritorio */}
           <div className="hidden lg:block lg:col-span-5 bg-white/85 backdrop-blur-sm rounded-2xl border border-slate-200/70 shadow-xs p-4 space-y-3">
-            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2">
-              Prospectos por Atención
+            <h3 className="text-xs font-bold text-slate-400 uppercase tracking-wider px-2 flex items-center justify-between">
+              <span>Prospectos por Atención</span>
+              <span className="text-[10px] font-mono lowercase text-slate-400 font-normal">por actividad reciente</span>
             </h3>
 
             <div className="space-y-2 max-h-[550px] overflow-y-auto pr-1">
               {pendingLeads.map((lead) => {
-                const hours = getHoursSinceContact(lead.createdAt);
+                const activity = getContactActivity(lead);
                 const isSelected = (selectedLead?.id === lead.id);
-
-                let badge = { text: 'Hoy', color: 'bg-emerald-50 text-emerald-800 border-emerald-200/60' };
-                if (hours >= 48) {
-                  badge = { text: `+${Math.floor(hours / 24)}d inactivo`, color: 'bg-rose-50 text-rose-800 border-rose-200/60' };
-                } else if (hours >= 24) {
-                  badge = { text: 'Hace 24h', color: 'bg-amber-50 text-amber-900 border-amber-200/60' };
-                }
+                const latestMsg = extractLatestMessage(lead.notes);
 
                 return (
                   <button
@@ -157,18 +210,27 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                         : 'border-slate-200/60 bg-white/60 hover:bg-white'
                     }`}
                   >
-                    <div className="min-w-0 space-y-0.5">
-                      <div className="flex items-center gap-2">
-                        <span className="font-extrabold text-xs text-slate-900 truncate">
+                    <div className="min-w-0 space-y-1 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-extrabold text-xs text-slate-900 truncate max-w-[170px]">
                           {lead.name}
                         </span>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${badge.color}`}>
-                          {badge.text}
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${activity.color} flex items-center gap-1`}>
+                          {activity.isHot && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />}
+                          {activity.text}
                         </span>
                       </div>
-                      <p className="text-[11px] text-slate-500 truncate">
-                        {lead.service}
-                      </p>
+                      
+                      {latestMsg ? (
+                        <p className="text-[11px] text-slate-600 truncate flex items-center gap-1">
+                          <MessageSquare className="w-3 h-3 text-emerald-600 shrink-0" />
+                          <span className="truncate italic">"{latestMsg}"</span>
+                        </p>
+                      ) : (
+                        <p className="text-[11px] text-slate-500 truncate">
+                          {lead.service}
+                        </p>
+                      )}
                     </div>
 
                     <ChevronRight className={`w-4 h-4 shrink-0 transition-transform ${isSelected ? 'text-violet-600 translate-x-0.5' : 'text-slate-400'}`} />
@@ -191,7 +253,7 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                   <h3 className="text-base sm:text-lg font-black text-slate-900">
                     {selectedLead.name}
                   </h3>
-                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium">
+                  <div className="flex items-center gap-2 text-xs text-slate-500 font-medium flex-wrap">
                     <span>{selectedLead.service}</span>
                     <span>•</span>
                     <div className="inline-flex items-center gap-1">
@@ -206,6 +268,11 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                       </a>
                       <CopyPhoneButton phone={selectedLead.phone} />
                     </div>
+                    <span>•</span>
+                    <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] border ${getContactActivity(selectedLead).color}`}>
+                      <Clock className="w-3 h-3" />
+                      <span>{getContactActivity(selectedLead).text}</span>
+                    </span>
                   </div>
                 </div>
 
@@ -220,6 +287,21 @@ export const FollowUpCenter: React.FC<FollowUpCenterProps> = ({ leads, onSaveNot
                   <ExternalLink className="w-3.5 h-3.5 opacity-70" />
                 </a>
               </div>
+
+              {/* Notificación inteligente si hay mensaje reciente recibido */}
+              {extractLatestMessage(selectedLead.notes) && (
+                <div className="bg-emerald-50/80 border border-emerald-200 rounded-xl p-3 text-xs text-emerald-950 flex items-start gap-2.5 shadow-2xs">
+                  <MessageCircle className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                  <div className="min-w-0">
+                    <span className="font-extrabold text-[11px] text-emerald-900 block">
+                      Última interacción registrada de WhatsApp:
+                    </span>
+                    <p className="text-xs text-emerald-800 font-medium italic mt-0.5">
+                      "{extractLatestMessage(selectedLead.notes)}"
+                    </p>
+                  </div>
+                </div>
+              )}
 
               {/* Plantillas de Seguimiento Rápido (Sin Box-in-Box) */}
               <div className="space-y-3">

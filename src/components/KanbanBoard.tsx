@@ -338,8 +338,8 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             {lead.service}
           </p>
           {lead.notes && (
-            <p className="text-[11px] text-slate-400 italic line-clamp-2 border-l-2 border-violet-300 pl-2 mt-0.5">
-              "{lead.notes}"
+            <p className="text-[11px] text-slate-500 italic line-clamp-2 border-l-2 border-violet-400 pl-2 mt-0.5">
+              "{lead.notes.split('\n').filter(Boolean).pop() || lead.notes}"
             </p>
           )}
         </div>

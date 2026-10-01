@@ -292,6 +292,8 @@ export const App: React.FC = () => {
               amount: Number(data.amount || 0),
               createdAt: data.createdAt || new Date().toISOString(),
               saleDate: data.saleDate,
+              lastContactDate: data.lastContactDate || data.createdAt,
+              source: data.source,
               tenantId: data.tenantId || 'kindev',
               metaEvents: Array.isArray(data.metaEvents) ? data.metaEvents : []
             });
