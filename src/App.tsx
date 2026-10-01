@@ -294,6 +294,7 @@ export const App: React.FC = () => {
               saleDate: data.saleDate,
               lastContactDate: data.lastContactDate || data.createdAt,
               source: data.source,
+              adSource: data.adSource || '',
               tenantId: data.tenantId || 'kindev',
               metaEvents: Array.isArray(data.metaEvents) ? data.metaEvents : []
             });

@@ -903,6 +903,35 @@ app.get('/api/whatsapp/outbound-stats', (req, res) => {
   });
 });
 
+app.get('/api/whatsapp/outbound-tracker-full', (req, res) => {
+  const entries = Array.from(outboundPhonesMap.entries())
+    .filter(([ph]) => /^\d{10,15}$/.test(ph)) // Only real phone numbers, not LIDs
+    .map(([phone, info]) => ({
+      phone,
+      firstSentAt: info.firstSentAt,
+      lastSentAt: info.lastSentAt,
+      snippet: info.snippet || '',
+      replyCount: info.replyCount || 0
+    }))
+    .sort((a, b) => b.lastSentAt - a.lastSentAt);
+  
+  const now = Date.now();
+  const replied = entries.filter(e => e.replyCount > 0).length;
+  const recent24h = entries.filter(e => (now - e.lastSentAt) < 86400000).length;
+  const cold48h = entries.filter(e => (now - e.lastSentAt) > 172800000).length;
+  const dead7d = entries.filter(e => (now - e.lastSentAt) > 604800000).length;
+  
+  return res.json({
+    totalProspected: entries.length,
+    replied,
+    responseRate: entries.length > 0 ? ((replied / entries.length) * 100).toFixed(1) : '0',
+    recent24h,
+    cold48h,
+    dead7d,
+    entries
+  });
+});
+
 // 2. Página visual para escanear el Código QR
 app.get('/qr', (req, res) => {
   res.send(`
