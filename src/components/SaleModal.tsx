@@ -8,7 +8,13 @@ interface SaleModalProps {
   lead: Lead | null;
   targetStatus?: 'anticipo' | 'cerrado';
   onClose: () => void;
-  onConfirmSale: (leadId: string, amount: number, note?: string, targetStatus?: 'anticipo' | 'cerrado') => Promise<void>;
+  onConfirmSale: (
+    leadId: string,
+    amount: number,
+    note?: string,
+    targetStatus?: 'anticipo' | 'cerrado',
+    skipCapi?: boolean
+  ) => Promise<void>;
 }
 
 export const SaleModal: React.FC<SaleModalProps> = ({ lead, targetStatus = 'cerrado', onClose, onConfirmSale }) => {
@@ -16,6 +22,7 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, targetStatus = 'cerr
   const [customInput, setCustomInput] = useState<string>('120.00');
   const [note, setNote] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
+  const [dispatchToCapi, setDispatchToCapi] = useState<boolean>(true);
 
   useEffect(() => {
     if (lead) {
@@ -48,13 +55,15 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, targetStatus = 'cerr
     setCustomInput(next.toFixed(2));
   };
 
-  const handleSubmit = async () => {
+  const handleSubmit = async (skipCapiManual?: boolean) => {
     const finalAmount = parseFloat(customInput);
     if (isNaN(finalAmount) || finalAmount <= 0) return;
 
+    const shouldSkip = skipCapiManual !== undefined ? skipCapiManual : !dispatchToCapi;
+
     setLoading(true);
     try {
-      await onConfirmSale(lead.id, finalAmount, note.trim() || '', targetStatus);
+      await onConfirmSale(lead.id, finalAmount, note.trim() || '', targetStatus, shouldSkip);
       onClose();
     } finally {
       setLoading(false);
@@ -208,9 +217,34 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, targetStatus = 'cerr
           />
         </div>
 
-        {/* Botón de Confirmación con el monto exacto */}
+        {/* Selector de Modo: Automático Meta CAPI o Manual */}
+        <div className="flex items-center justify-between p-3 rounded-2xl bg-slate-50 border border-slate-200/80 text-xs">
+          <div className="flex flex-col pr-2">
+            <span className="font-extrabold text-slate-800">
+              Despachar a Meta CAPI
+            </span>
+            <span className="text-[11px] text-slate-500 font-medium">
+              {dispatchToCapi
+                ? 'Se transmitirá el evento Purchase a Meta Ads'
+                : 'Modo 100% manual (sin conexión externa con Meta)'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setDispatchToCapi(!dispatchToCapi)}
+            className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all border active:scale-95 ${
+              dispatchToCapi
+                ? 'bg-violet-600 text-white border-violet-600 shadow-2xs'
+                : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+            }`}
+          >
+            {dispatchToCapi ? 'CAPI Activo' : 'Solo Manual'}
+          </button>
+        </div>
+
+        {/* Botón de Confirmación Principal */}
         <button
-          onClick={handleSubmit}
+          onClick={() => handleSubmit(false)}
           disabled={loading || isNaN(parseFloat(customInput)) || parseFloat(customInput) <= 0}
           className={`w-full py-3.5 px-4 rounded-2xl active:scale-[0.98] text-white font-bold text-sm shadow-lg transition-all flex items-center justify-center gap-2 disabled:opacity-50 ${
             targetStatus === 'anticipo'
@@ -221,19 +255,34 @@ export const SaleModal: React.FC<SaleModalProps> = ({ lead, targetStatus = 'cerr
           {loading ? (
             <>
               <Loader2 className="w-4 h-4 animate-spin" />
-              <span>Despachando a Meta CAPI...</span>
+              <span>{dispatchToCapi ? 'Procesando y Despachando...' : 'Guardando Anticipo...'}</span>
             </>
           ) : (
             <>
               <Send className="w-4 h-4" />
               <span>
                 {targetStatus === 'anticipo'
-                  ? `Confirmar Anticipo ($${parseFloat(customInput || '0').toFixed(2)} USD) & Despachar Purchase`
-                  : `Enviar $${parseFloat(customInput || '0').toFixed(2)} USD a Meta CAPI`}
+                  ? dispatchToCapi
+                    ? `Confirmar Anticipo ($${parseFloat(customInput || '0').toFixed(2)} USD) & Despachar CAPI`
+                    : `Confirmar Anticipo ($${parseFloat(customInput || '0').toFixed(2)} USD) Manualmente`
+                  : dispatchToCapi
+                    ? `Enviar $${parseFloat(customInput || '0').toFixed(2)} USD a Meta CAPI`
+                    : `Cerrar Venta ($${parseFloat(customInput || '0').toFixed(2)} USD) Manualmente`}
               </span>
             </>
           )}
         </button>
+
+        {/* Opción rápida: Registrar 100% manual si CAPI está activo */}
+        {dispatchToCapi && !loading && (
+          <button
+            type="button"
+            onClick={() => handleSubmit(true)}
+            className="w-full text-center text-xs text-slate-500 hover:text-slate-800 font-semibold py-1 transition-colors"
+          >
+            O registrar {targetStatus === 'anticipo' ? 'anticipo' : 'venta'} directamente de forma manual (sin Meta)
+          </button>
+        )}
 
       </div>
     </div>

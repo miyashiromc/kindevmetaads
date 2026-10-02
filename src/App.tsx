@@ -617,15 +617,22 @@ export const App: React.FC = () => {
     try {
       const target = leads.find((l) => l.id === id);
       const hadPurchase = target?.metaEvents?.some((e) => e.eventName === 'Purchase');
+      const now = new Date().toISOString();
+      const updates: { status: LeadStatus; saleDate?: string } = { status: newStatus };
+      if ((newStatus === 'anticipo' || newStatus === 'cerrado') && !target?.saleDate) {
+        updates.saleDate = now;
+      }
 
       if (firestoreConnected) {
         const leadRef = doc(db, 'leads', id);
-        await updateDoc(leadRef, { status: newStatus });
+        await updateDoc(leadRef, updates);
       } else {
-        const updated = leads.map((l) => (l.id === id ? { ...l, status: newStatus } : l));
+        const updated = leads.map((l) => (l.id === id ? { ...l, ...updates } : l));
         setLeads(updated);
         localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
       }
+
+      setProfileLead((prev) => (prev && prev.id === id ? { ...prev, ...updates } : prev));
 
       if (newStatus === 'cerrado' && hadPurchase) {
         showToast('Proyecto marcado como Entregado / Cerrado (Purchase ya enviado a Meta en anticipo)', 'success');
@@ -659,16 +666,22 @@ export const App: React.FC = () => {
 
   const handleSaveLeadProfile = async (leadId: string, updates: Partial<Lead>) => {
     try {
+      const target = leads.find((l) => l.id === leadId);
+      const finalUpdates = { ...updates };
+      if ((updates.status === 'anticipo' || updates.status === 'cerrado') && !target?.saleDate && !updates.saleDate) {
+        finalUpdates.saleDate = new Date().toISOString();
+      }
+
       if (firestoreConnected) {
         const leadRef = doc(db, 'leads', leadId);
-        await updateDoc(leadRef, updates);
+        await updateDoc(leadRef, finalUpdates);
       } else {
-        const updated = leads.map((l) => (l.id === leadId ? { ...l, ...updates } : l));
+        const updated = leads.map((l) => (l.id === leadId ? { ...l, ...finalUpdates } : l));
         setLeads(updated);
         localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
       }
       // Actualizar también el modal si está abierto
-      setProfileLead((prev) => (prev && prev.id === leadId ? { ...prev, ...updates } : prev));
+      setProfileLead((prev) => (prev && prev.id === leadId ? { ...prev, ...finalUpdates } : prev));
       showToast('Perfil del cliente actualizado correctamente', 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Error al guardar perfil del cliente';
@@ -677,10 +690,66 @@ export const App: React.FC = () => {
     }
   };
 
-  const handleConfirmSale = async (leadId: string, amount: number, note?: string, targetStatus: 'anticipo' | 'cerrado' = 'cerrado') => {
+  const handleConfirmSale = async (
+    leadId: string,
+    amount: number,
+    note?: string,
+    targetStatus: 'anticipo' | 'cerrado' = 'cerrado',
+    skipCapi: boolean = false
+  ) => {
     const targetLead = leads.find((l) => l.id === leadId);
     if (!targetLead) return;
 
+    const updatedNotes = note !== undefined ? note : targetLead.notes || '';
+    const saleDate = targetLead.saleDate || new Date().toISOString();
+
+    // 1. Guardar SIEMPRE en base de datos primero para evitar bloqueos del CRM
+    try {
+      if (firestoreConnected) {
+        const leadRef = doc(db, 'leads', leadId);
+        await updateDoc(leadRef, {
+          status: targetStatus,
+          amount,
+          notes: updatedNotes,
+          saleDate
+        });
+      } else {
+        const updated = leads.map((l) =>
+          l.id === leadId
+            ? {
+                ...l,
+                status: targetStatus,
+                amount,
+                notes: updatedNotes,
+                saleDate
+              }
+            : l
+        );
+        setLeads(updated);
+        localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
+      }
+      setProfileLead((prev) =>
+        prev && prev.id === leadId
+          ? { ...prev, status: targetStatus, amount, notes: updatedNotes, saleDate }
+          : prev
+      );
+    } catch (saveErr) {
+      console.error('Error guardando anticipo/venta en base de datos:', saveErr);
+      showToast('Error al registrar el anticipo/venta en base de datos', 'error');
+      throw saveErr;
+    }
+
+    // 2. Si se solicitó modo manual (skipCapi), confirmar inmediatamente
+    if (skipCapi) {
+      if (targetStatus === 'anticipo') {
+        showToast(`¡Anticipo de $${amount.toFixed(2)} USD registrado manualmente con éxito!`, 'success');
+      } else {
+        showToast(`¡Venta de $${amount.toFixed(2)} USD registrada manualmente con éxito!`, 'success');
+      }
+      return;
+    }
+
+    // 3. Despacho a Meta CAPI con manejo resiliente y no bloqueante
     try {
       const purchaseEventId = generateEventId('purchase');
       const fbc = targetLead.fbc || getFbc() || undefined;
@@ -689,7 +758,6 @@ export const App: React.FC = () => {
       // Disparar en Píxel del navegador con eventID para deduplicación
       trackPixelEvent('Purchase', { value: amount, currency: 'USD' }, purchaseEventId);
 
-      // 1. Despachar a Meta CAPI con SHA-256 (usando credenciales del tenant si aplica)
       const tenantMetaCreds = activeTenantId !== 'kindev' && activeTenant?.metaConfig?.datasetId
         ? {
             datasetId: activeTenant.metaConfig.datasetId,
@@ -727,30 +795,13 @@ export const App: React.FC = () => {
       };
 
       const updatedEvents = [...(targetLead.metaEvents || []), newMetaEvent];
-      const updatedNotes = note ? note : targetLead.notes || '';
 
-      // 2. Guardar en Firestore o Local
       if (firestoreConnected) {
         const leadRef = doc(db, 'leads', leadId);
-        await updateDoc(leadRef, {
-          status: targetStatus,
-          amount,
-          notes: updatedNotes,
-          saleDate: new Date().toISOString(),
-          metaEvents: updatedEvents
-        });
+        await updateDoc(leadRef, { metaEvents: updatedEvents });
       } else {
         const updated = leads.map((l) =>
-          l.id === leadId
-            ? {
-                ...l,
-                status: targetStatus,
-                amount,
-                notes: updatedNotes,
-                saleDate: new Date().toISOString(),
-                metaEvents: updatedEvents
-              }
-            : l
+          l.id === leadId ? { ...l, metaEvents: updatedEvents } : l
         );
         setLeads(updated);
         localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
@@ -762,9 +813,12 @@ export const App: React.FC = () => {
         showToast(`¡Venta de $${amount.toFixed(2)} USD enviada a Meta CAPI! (Trace: ${capiRes.fbtraceId})`, 'success');
       }
     } catch (err: unknown) {
+      console.warn('Advertencia Meta CAPI (el registro local se mantuvo):', err);
       const msg = err instanceof Error ? err.message : 'Error enviando evento a Meta CAPI';
-      showToast(msg, 'error');
-      throw err;
+      showToast(
+        `¡${targetStatus === 'anticipo' ? 'Anticipo' : 'Venta'} de $${amount.toFixed(2)} USD registrado! (Aviso CAPI: ${msg})`,
+        'info'
+      );
     }
   };
 

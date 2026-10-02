@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
 import { CopyPhoneButton } from './CopyPhoneButton';
+import { DailyLeadsTracker, DateFilterType, toLocalDateKey } from './DailyLeadsTracker';
 
 interface KanbanBoardProps {
   leads: Lead[];
@@ -84,24 +85,42 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   const [draggedLeadId, setDraggedLeadId] = useState<string | null>(null);
   const [activeDropCol, setActiveDropCol] = useState<LeadStatus | null>(null);
   const [searchFilter, setSearchFilter] = useState('');
+  const [dateFilter, setDateFilter] = useState<DateFilterType>('all');
   const [activeStageIndex, setActiveStageIndex] = useState<number>(0);
   const [editingLeadId, setEditingLeadId] = useState<string | null>(null);
   const [editNameValue, setEditNameValue] = useState<string>('');
   const [isSavingName, setIsSavingName] = useState<boolean>(false);
   const columnsContainerRef = React.useRef<HTMLDivElement>(null);
 
-  // Filtrar leads por búsqueda interna del Kanban
+  // Filtrar leads por fecha y búsqueda interna del Kanban
   const filteredLeads = useMemo(() => {
-    if (!searchFilter.trim()) return leads;
+    let result = leads;
+
+    if (dateFilter !== 'all') {
+      const todayKey = toLocalDateKey(new Date());
+      const yesterdayDate = new Date();
+      yesterdayDate.setDate(yesterdayDate.getDate() - 1);
+      const yesterdayKey = toLocalDateKey(yesterdayDate);
+
+      if (dateFilter === 'today') {
+        result = result.filter((l) => toLocalDateKey(l.createdAt) === todayKey);
+      } else if (dateFilter === 'yesterday') {
+        result = result.filter((l) => toLocalDateKey(l.createdAt) === yesterdayKey);
+      } else {
+        result = result.filter((l) => toLocalDateKey(l.createdAt) === dateFilter);
+      }
+    }
+
+    if (!searchFilter.trim()) return result;
     const q = searchFilter.toLowerCase();
-    return leads.filter(
+    return result.filter(
       (l) =>
         l.name.toLowerCase().includes(q) ||
         l.phone.includes(q) ||
         l.service.toLowerCase().includes(q) ||
         (l.notes && l.notes.toLowerCase().includes(q))
     );
-  }, [leads, searchFilter]);
+  }, [leads, searchFilter, dateFilter]);
 
   // Totales de métricas rápidas del tablero
   const pipelineMetrics = useMemo(() => {
@@ -394,6 +413,15 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               <CheckCircle2 className="w-3.5 h-3.5" />
               <span>Entregar Proyecto ➔</span>
             </button>
+          ) : lead.status === 'prospecto' ? (
+            <button
+              type="button"
+              onClick={() => onUpdateStatus(lead.id, 'cotizado')}
+              className="flex-1 h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
+              title="Marcar como Cotizado y pasar a la siguiente etapa comercial"
+            >
+              <span>Cotizado ➔</span>
+            </button>
           ) : (
             <button
               type="button"
@@ -512,6 +540,13 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         </div>
 
       </div>
+
+      {/* ─── CONTADOR DIARIO Y SEMANAL DE LEADS (Hoy vs Ayer + Ritmo Semanal) ─── */}
+      <DailyLeadsTracker
+        leads={leads}
+        selectedFilter={dateFilter}
+        onSelectFilter={setDateFilter}
+      />
 
       {/* ─── VISTA MÓVIL: SELECTOR ERGONÓMICO DE ETAPAS & LISTA FLUIDA (sm:hidden) ─── */}
       <div className="sm:hidden space-y-3">

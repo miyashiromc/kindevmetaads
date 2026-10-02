@@ -507,14 +507,38 @@ export const LeadProfileView: React.FC<LeadProfileViewProps> = ({
             {onOpenSaleModal && (
               <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
                 {!hasPurchaseEvent ? (
-                  <button
-                    type="button"
-                    onClick={() => onOpenSaleModal(lead, 'anticipo')}
-                    className="w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
-                  >
-                    <DollarSign className="w-4 h-4" />
-                    <span>Registrar Anticipo y Despachar CAPI</span>
-                  </button>
+                  <>
+                    <button
+                      type="button"
+                      onClick={() => onOpenSaleModal(lead, 'anticipo')}
+                      className="w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
+                    >
+                      <DollarSign className="w-4 h-4" />
+                      <span>Registrar Anticipo y Despachar CAPI</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        const parsedAmount = parseFloat(amountInput) || 0;
+                        await onSaveLead(lead.id, {
+                          name: name.trim(),
+                          phone: phone.trim().replace(/\D/g, ''),
+                          email: email.trim(),
+                          service: service.trim(),
+                          amount: isNaN(parsedAmount) ? 0 : parsedAmount,
+                          status: 'anticipo',
+                          notes: notes.trim()
+                        });
+                        setStatus('anticipo');
+                        onBack();
+                      }}
+                      className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-200/80"
+                      title="Marcar como Pagó Anticipo de manera 100% manual sin enviar a Meta"
+                    >
+                      <Check className="w-3.5 h-3.5 text-slate-500" />
+                      <span>Marcar Pagó Anticipo Manualmente</span>
+                    </button>
+                  </>
                 ) : (
                   <button
                     type="button"

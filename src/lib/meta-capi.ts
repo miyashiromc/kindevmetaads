@@ -217,13 +217,24 @@ export async function dispatchMetaCAPI(
     eventData.test_event_code = params.testEventCode.trim();
   }
 
-  const url = `https://graph.facebook.com/v19.0/${resolvedDatasetId}/events?access_token=${token}`;
+  const url = `https://graph.facebook.com/v21.0/${resolvedDatasetId}/events?access_token=${token}`;
 
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ data: [eventData] })
-  });
+  let res: Response;
+  try {
+    const formParams = new URLSearchParams();
+    formParams.append('data', JSON.stringify([eventData]));
+    if (params.testMode && params.testEventCode?.trim()) {
+      formParams.append('test_event_code', params.testEventCode.trim());
+    }
+
+    res = await fetch(url, {
+      method: 'POST',
+      body: formParams
+    });
+  } catch (netErr: unknown) {
+    console.warn('Fallo de conexión en Meta CAPI:', netErr);
+    throw new Error('Bloqueado por bloqueador de anuncios (AdBlock/Brave) o fallo de red');
+  }
 
   interface MetaApiResponse {
     events_received: number;
@@ -233,7 +244,7 @@ export async function dispatchMetaCAPI(
     };
   }
 
-  const resData: MetaApiResponse = await res.json();
+  const resData: MetaApiResponse = await res.json().catch(() => ({ events_received: 0, fbtrace_id: 'unknown' }));
   if (!res.ok) {
     throw new Error(resData?.error?.message || 'Error al conectar con Meta CAPI');
   }
