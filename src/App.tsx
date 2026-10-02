@@ -277,10 +277,12 @@ export const App: React.FC = () => {
       const unsubscribe = onSnapshot(
         leadsCol,
         (snapshot) => {
-          const fetchedLeads: Lead[] = [];
+          // Mapeo defensivo anti-duplicados por teléfono normalizado
+          const uniqueLeadsMap = new Map<string, Lead>();
+
           snapshot.forEach((docSnapshot) => {
             const data = docSnapshot.data();
-            fetchedLeads.push({
+            const leadItem: Lead = {
               id: docSnapshot.id,
               name: data.name || 'Sin Nombre',
               phone: data.phone || '',
@@ -297,8 +299,56 @@ export const App: React.FC = () => {
               adSource: data.adSource || '',
               tenantId: data.tenantId || 'kindev',
               metaEvents: Array.isArray(data.metaEvents) ? data.metaEvents : []
-            });
+            };
+
+            const cleanPh = (leadItem.phone || '').replace(/\D/g, '');
+            if (!cleanPh) {
+              uniqueLeadsMap.set(`id_${leadItem.id}`, leadItem);
+              return;
+            }
+
+            const existing = uniqueLeadsMap.get(cleanPh);
+            if (!existing) {
+              uniqueLeadsMap.set(cleanPh, leadItem);
+            } else {
+              // Priorizar el estado comercial más avanzado y la información publicitaria más rica
+              const statusWeights: Record<LeadStatus, number> = {
+                cerrado: 5,
+                anticipo: 4,
+                cotizado: 3,
+                prospecto: 2,
+                descartado: 1
+              };
+              const existingWeight = statusWeights[existing.status] || 0;
+              const currentWeight = statusWeights[leadItem.status] || 0;
+
+              const pickCurrent = 
+                currentWeight > existingWeight ||
+                (currentWeight === existingWeight && (
+                  leadItem.service.includes('Meta Ads') ||
+                  (leadItem.notes && !existing.notes) ||
+                  (new Date(leadItem.createdAt).getTime() > new Date(existing.createdAt).getTime() && leadItem.notes !== 'Mensaje: ""')
+                ));
+
+              const winner = pickCurrent ? leadItem : existing;
+              const loser = pickCurrent ? existing : leadItem;
+
+              let combinedNotes = winner.notes || '';
+              if (loser.notes && loser.notes !== 'Mensaje: ""' && !combinedNotes.includes(loser.notes)) {
+                combinedNotes = combinedNotes ? `${combinedNotes}\n${loser.notes}` : loser.notes;
+              }
+
+              uniqueLeadsMap.set(cleanPh, {
+                ...winner,
+                notes: combinedNotes,
+                createdAt: new Date(winner.createdAt).getTime() < new Date(loser.createdAt).getTime()
+                  ? winner.createdAt
+                  : loser.createdAt
+              });
+            }
           });
+
+          const fetchedLeads = Array.from(uniqueLeadsMap.values());
 
           // Ordenar por fecha descendente
           fetchedLeads.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -502,6 +552,15 @@ export const App: React.FC = () => {
     isClosedImmediately?: boolean;
     note?: string;
   }) => {
+    const cleanPh = (data.phone || '').replace(/\D/g, '');
+    if (cleanPh) {
+      const existing = leads.find((l) => (l.phone || '').replace(/\D/g, '') === cleanPh);
+      if (existing) {
+        showToast(`Ya existe un cliente con este teléfono: "${existing.name}"`, 'error');
+        return;
+      }
+    }
+
     const saleAmount = Number(data.amount || 0);
     const isClosed = Boolean(data.isClosedImmediately);
     let initialEvents: MetaEventRecord[] = [];

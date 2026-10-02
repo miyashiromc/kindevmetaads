@@ -406,7 +406,8 @@ async function syncFirestoreExistingLeadsCache() {
           name: f.name?.stringValue || '',
           status: f.status?.stringValue || 'prospecto',
           amount: f.amount?.doubleValue || f.amount?.integerValue || 0,
-          notes: f.notes?.stringValue || ''
+          notes: f.notes?.stringValue || '',
+          service: f.service?.stringValue || ''
         });
       }
     }
@@ -425,35 +426,66 @@ async function saveLeadToFirestore({ name, phone, displayPhone, service, notes, 
   const cleanPh = cleanPhone(phone);
   if (!cleanPh) return false;
 
-  // 1. VERIFICACIÓN ANTI-DUPLICADOS ESTRICTA (Protege clientes cerrados y avanzados)
+  // 1. VERIFICACIÓN ANTI-DUPLICADOS ESTRICTA (Protege clientes existentes y en vuelo)
   const existingLead = existingFirestoreLeadsByPhone.get(cleanPh);
   if (existingLead) {
-    console.log(`🛡️ [Anti-Duplicados] Cliente existente detectado: "${existingLead.name}" (+${cleanPh}) [Estado: ${existingLead.status}]. Actualizando notas sin duplicar documento.`);
-    try {
-      const updatedNotes = existingLead.notes 
-        ? `${existingLead.notes}\n[Nuevo mensaje WhatsApp ${new Date().toLocaleTimeString()}]: "${notes || ''}"`
-        : notes || '';
-      
-      const patchUrl = `${FIRESTORE_REST_URL}/${existingLead.id}?updateMask.fieldPaths=notes&updateMask.fieldPaths=lastContactDate`;
-      await fetch(patchUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          fields: {
-            notes: { stringValue: updatedNotes.slice(0, 1500) },
-            lastContactDate: { stringValue: new Date().toISOString() }
-          }
-        })
-      });
-      existingLead.notes = updatedNotes;
-      return true;
-    } catch (patchErr) {
-      console.error('Error actualizando cliente existente:', patchErr.message);
-      return false;
+    // Si la creación inicial aún está en vuelo por concurrencia, esperar hasta 2s para que tenga ID real
+    if (existingLead.id && existingLead.id.startsWith('pending_')) {
+      let waitCount = 0;
+      while (existingLead.id && existingLead.id.startsWith('pending_') && waitCount < 20) {
+        await new Promise((r) => setTimeout(r, 100));
+        waitCount++;
+      }
+    }
+
+    if (existingLead.id && !existingLead.id.startsWith('pending_')) {
+      console.log(`🛡️ [Anti-Duplicados] Cliente existente detectado: "${existingLead.name}" (+${cleanPh}) [Estado: ${existingLead.status}]. Actualizando datos sin duplicar documento.`);
+      try {
+        const cleanNotes = notes && notes !== 'Mensaje: ""' ? notes : '';
+        const updatedNotes = existingLead.notes 
+          ? (cleanNotes ? `${existingLead.notes}\n[Nuevo mensaje WhatsApp ${new Date().toLocaleTimeString()}]: "${cleanNotes}"` : existingLead.notes)
+          : cleanNotes;
+        
+        const shouldUpgradeService = service && service.includes('Meta Ads') && (!existingLead.service || !existingLead.service.includes('Meta Ads'));
+        let fieldPaths = 'updateMask.fieldPaths=notes&updateMask.fieldPaths=lastContactDate';
+        const patchFields = {
+          notes: { stringValue: updatedNotes.slice(0, 1500) },
+          lastContactDate: { stringValue: new Date().toISOString() }
+        };
+
+        if (shouldUpgradeService) {
+          fieldPaths += '&updateMask.fieldPaths=service';
+          patchFields.service = { stringValue: service };
+          existingLead.service = service;
+        }
+
+        const patchUrl = `${FIRESTORE_REST_URL}/${existingLead.id}?${fieldPaths}`;
+        await fetch(patchUrl, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fields: patchFields })
+        });
+        existingLead.notes = updatedNotes;
+        return true;
+      } catch (patchErr) {
+        console.error('Error actualizando cliente existente:', patchErr.message);
+        return false;
+      }
     }
   }
 
-  // 2. Si no existe, insertar nuevo documento único
+  // 2. Si no existe, RESERVAR INMEDIATAMENTE en memoria para abortar cualquier concurrencia simultánea
+  const tempPendingId = `pending_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
+  existingFirestoreLeadsByPhone.set(cleanPh, {
+    id: tempPendingId,
+    name: name || 'Cliente WhatsApp',
+    status: 'prospecto',
+    amount: 0,
+    notes: notes || '',
+    service: service || 'Contacto Inicial WhatsApp'
+  });
+  markPhoneProcessed(cleanPh);
+
   try {
     const firestorePayload = {
       fields: {
@@ -486,15 +518,18 @@ async function saveLeadToFirestore({ name, phone, displayPhone, service, notes, 
         name: name || 'Cliente WhatsApp',
         status: 'prospecto',
         amount: 0,
-        notes: notes || ''
+        notes: notes || '',
+        service: service || 'Contacto Inicial WhatsApp'
       });
       return true;
     } else {
       console.error('Error guardando lead en Firestore:', await response.text());
+      existingFirestoreLeadsByPhone.delete(cleanPh);
       return false;
     }
   } catch (dbErr) {
     console.error('Error insertando en Firestore:', dbErr.message);
+    existingFirestoreLeadsByPhone.delete(cleanPh);
     return false;
   }
 }
@@ -506,6 +541,9 @@ function addToRecentMessagesBuffer(msg) {
   recentMessagesBuffer.unshift(msg);
   if (recentMessagesBuffer.length > 300) recentMessagesBuffer.pop();
 }
+
+// Conjunto de teléfonos con operaciones en vuelo (Mutex para evitar concurrencia en mensajes seguidos)
+const inFlightPhones = new Set();
 
 // Función maestra de procesamiento con Bloque de Decisión Bimodal
 async function processIncomingMessage(sock, msg, contextSource = 'live') {
@@ -560,121 +598,158 @@ async function processIncomingMessage(sock, msg, contextSource = 'live') {
   // 5. Desenmascarar número telefónico real (LID de Meta Ads o directo)
   const { phone, display: displayPhone } = await resolveRealPhone(sock, msg);
   if (!phone) return { saved: false, reason: 'invalid_phone' };
+  const cleanPh = cleanPhone(phone);
+  if (!cleanPh) return { saved: false, reason: 'invalid_phone' };
 
   // 6. Lista de exclusión de números propios / administradores
-  if (EXCLUDED_PHONES.includes(phone)) {
+  if (EXCLUDED_PHONES.includes(cleanPh)) {
     if (msgId) markMessageIdProcessed(msgId);
     return { saved: false, reason: 'excluded_phone' };
   }
 
-  // 7. Evitar duplicar lead en ventana de 24h para el mismo teléfono
-  if (isPhoneRecentlyProcessed(phone)) {
-    if (msgId) markMessageIdProcessed(msgId);
-    return { saved: false, reason: 'phone_recently_processed' };
+  // 7. Mutex concurrente: si hay un procesamiento activo para este teléfono, esperar
+  if (inFlightPhones.has(cleanPh)) {
+    console.log(`⏳ [Anti-Duplicados] Operación en curso para +${cleanPh}. Esperando resolución del mensaje previo...`);
+    let waited = 0;
+    while (inFlightPhones.has(cleanPh) && waited < 25) {
+      await new Promise((r) => setTimeout(r, 100));
+      waited++;
+    }
   }
 
-  // 8. Extraer contenido textual o multimedia del mensaje
-  const pushName = msg.pushName || 'Cliente WhatsApp';
-  let text =
-    msg.message?.conversation ||
-    msg.message?.extendedTextMessage?.text ||
-    msg.message?.imageMessage?.caption ||
-    msg.message?.videoMessage?.caption ||
-    msg.message?.documentMessage?.caption ||
-    msg.message?.buttonsResponseMessage?.selectedDisplayText ||
-    msg.message?.listResponseMessage?.title ||
-    msg.message?.templateButtonReplyMessage?.selectedId ||
-    '';
+  inFlightPhones.add(cleanPh);
 
-  const isAudio = !!(msg.message?.audioMessage);
-  const isMedia = !!(msg.message?.imageMessage || msg.message?.videoMessage || msg.message?.documentMessage);
+  try {
+    // 8. Extraer contenido textual o multimedia del mensaje
+    const pushName = msg.pushName || 'Cliente WhatsApp';
+    let text =
+      msg.message?.conversation ||
+      msg.message?.extendedTextMessage?.text ||
+      msg.message?.imageMessage?.caption ||
+      msg.message?.videoMessage?.caption ||
+      msg.message?.documentMessage?.caption ||
+      msg.message?.buttonsResponseMessage?.selectedDisplayText ||
+      msg.message?.listResponseMessage?.title ||
+      msg.message?.templateButtonReplyMessage?.selectedId ||
+      '';
 
-  if (!text) {
-    if (isAudio) text = '[Nota de voz / Audio recibido]';
-    else if (isMedia) text = '[Archivo multimedia / Documento recibido]';
-  }
+    const isAudio = !!(msg.message?.audioMessage);
+    const isMedia = !!(msg.message?.imageMessage || msg.message?.videoMessage || msg.message?.documentMessage);
 
-  // 9. Detección de contacto de prospección / script (OUTBOUND)
-  const isOutboundTarget = isPhoneOutboundTracked(phone, remoteJid);
-  const lowerText = text.toLowerCase().trim();
-
-  // === REGLA ESTRICTA: NINGÚN CONTACTO DEL SCRIPT (OUTBOUND) SE AGREGA A FIRESTORE NI A CAPI ===
-  // Aunque responda, pregunte precio o envíe audio, NUNCA se crea como lead en la pantalla.
-  if (isOutboundTarget) {
-    console.log(`🛡️ [Outbound Script Bloqueado] Contacto de prospección ${pushName} (${displayPhone}): "${text}". Omitido rotundamente para no ensuciar el CRM.`);
-    if (msgId) markMessageIdProcessed(msgId);
-
-    // Si ya existe como cliente cerrado o con anticipo previo en Firestore, anexamos la nota a su ficha
-    const cleanPh = cleanPhone(phone);
-    const existingLead = existingFirestoreLeadsByPhone.get(cleanPh);
-    if (existingLead && (existingLead.status === 'cerrado' || existingLead.status === 'anticipo' || existingLead.amount > 0)) {
-      try {
-        const updatedNotes = existingLead.notes 
-          ? `${existingLead.notes}\n[WhatsApp ${new Date().toLocaleTimeString()}]: "${text}"`
-          : text;
-        const patchUrl = `${FIRESTORE_REST_URL}/${existingLead.id}?updateMask.fieldPaths=notes&updateMask.fieldPaths=lastContactDate`;
-        fetch(patchUrl, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            fields: {
-              notes: { stringValue: updatedNotes.slice(0, 1500) },
-              lastContactDate: { stringValue: new Date().toISOString() }
-            }
-          })
-        }).catch(() => {});
-        existingLead.notes = updatedNotes;
-      } catch (e) {}
+    if (!text) {
+      if (isAudio) text = '[Nota de voz / Audio recibido]';
+      else if (isMedia) text = '[Archivo multimedia / Documento recibido]';
     }
 
-    return { saved: false, reason: 'outbound_script_blocked' };
+    // 9. Detección real de Anuncio Meta Ads (CTWA)
+    const hasMetaAdReferral = !!(
+      msg.message?.extendedTextMessage?.contextInfo?.externalAdReply ||
+      msg.message?.extendedTextMessage?.contextInfo?.advertisementDetails ||
+      msg.message?.extendedTextMessage?.contextInfo?.referral ||
+      msg.message?.templateButtonReplyMessage
+    );
+
+    // 10. Descarte de paquetes vacíos (sin texto, sin audio, sin medios y sin referencia publicitaria)
+    if (!text.trim() && !isAudio && !isMedia && !hasMetaAdReferral) {
+      if (msgId) markMessageIdProcessed(msgId);
+      return { saved: false, reason: 'empty_ping_no_substance' };
+    }
+
+    // 11. Detección de contacto de prospección / script (OUTBOUND)
+    const isOutboundTarget = isPhoneOutboundTracked(cleanPh, remoteJid);
+    const lowerText = text.toLowerCase().trim();
+
+    // === REGLA ESTRICTA: NINGÚN CONTACTO DEL SCRIPT (OUTBOUND) SE AGREGA A FIRESTORE NI A CAPI ===
+    if (isOutboundTarget) {
+      console.log(`🛡️ [Outbound Script Bloqueado] Contacto de prospección ${pushName} (${displayPhone}): "${text}". Omitido rotundamente para no ensuciar el CRM.`);
+      if (msgId) markMessageIdProcessed(msgId);
+
+      const existingLead = existingFirestoreLeadsByPhone.get(cleanPh);
+      if (existingLead && (existingLead.status === 'cerrado' || existingLead.status === 'anticipo' || existingLead.amount > 0)) {
+        try {
+          const updatedNotes = existingLead.notes 
+            ? `${existingLead.notes}\n[WhatsApp ${new Date().toLocaleTimeString()}]: "${text}"`
+            : text;
+          const patchUrl = `${FIRESTORE_REST_URL}/${existingLead.id}?updateMask.fieldPaths=notes&updateMask.fieldPaths=lastContactDate`;
+          fetch(patchUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              fields: {
+                notes: { stringValue: updatedNotes.slice(0, 1500) },
+                lastContactDate: { stringValue: new Date().toISOString() }
+              }
+            })
+          }).catch(() => {});
+          existingLead.notes = updatedNotes;
+        } catch (e) {}
+      }
+
+      return { saved: false, reason: 'outbound_script_blocked' };
+    }
+
+    // 12. Filtro de descarte de auto-respuestas de empresas / veterinarias / bots de prospección externa
+    const isBusinessAutoReply = BUSINESS_AUTOREPLY_PATTERNS.some(p => lowerText.includes(p));
+    if (isBusinessAutoReply) {
+      console.log(`🧹 [Auto-Respuesta / Prospección Externa Descartada] ${pushName} (${displayPhone}): "${text}". No se agrega a Firestore.`);
+      if (msgId) markMessageIdProcessed(msgId);
+      recordOutboundMessage(cleanPh || remoteJid.split('@')[0], text);
+      return { saved: false, reason: 'business_autoreply_discarded' };
+    }
+
+    // 13. Verificación de lead existente o recientemente procesado
+    const existingLead = existingFirestoreLeadsByPhone.get(cleanPh);
+    if (existingLead || isPhoneRecentlyProcessed(cleanPh)) {
+      console.log(`🛡️ [Anti-Duplicados] Lead ya registrado para +${cleanPh}. Anexando actividad sin duplicar documento.`);
+      if (msgId) markMessageIdProcessed(msgId);
+
+      // Si tenemos ficha existente y hay texto o anuncio de referencia, actualizar notas y servicio
+      if (existingLead) {
+        await saveLeadToFirestore({
+          name: pushName,
+          phone: cleanPh,
+          displayPhone,
+          service: hasMetaAdReferral ? 'Anuncio Meta Ads WhatsApp' : (existingLead.service || 'Contacto Inicial WhatsApp'),
+          notes: text ? `Mensaje: "${text}"` : '',
+          source: 'whatsapp_auto',
+          eventId: `wa_${cleanPh}_${Date.now()}`
+        });
+      }
+
+      return { saved: false, reason: 'phone_already_exists_updated' };
+    }
+
+    // === RAMA: CLIENTE INBOUND GENUINO Y NUEVO ===
+    console.log(`🚀 [Lead Inbound Detectado!] (${contextSource}) De: ${pushName} | Tel: ${displayPhone} (JID: ${remoteJid}) - "${text}"`);
+    markPhoneProcessed(cleanPh);
+
+    // B.1: Despacho a Meta CAPI (solo si viene por anuncio o inbound genuino)
+    const capiRes = await dispatchCapiBusinessMessagingLead({
+      phone: cleanPh || displayPhone,
+      name: pushName,
+      remoteJid,
+      text
+    });
+
+    // B.2: Guardar en Firestore con source: 'whatsapp_auto'
+    const saved = await saveLeadToFirestore({
+      name: pushName,
+      phone: cleanPh,
+      displayPhone,
+      service: hasMetaAdReferral ? 'Anuncio Meta Ads WhatsApp' : 'Contacto Inicial WhatsApp',
+      notes: `Mensaje: "${text}"`,
+      source: 'whatsapp_auto',
+      eventId: capiRes?.eventId || `wa_${cleanPh}_${Date.now()}`
+    });
+
+    if (saved) {
+      if (msgId) markMessageIdProcessed(msgId);
+    }
+
+    return { saved, source: 'whatsapp_auto' };
+  } finally {
+    inFlightPhones.delete(cleanPh);
   }
-
-  // 10. Filtro de descarte de auto-respuestas de empresas / veterinarias / bots de prospección externa
-  const isBusinessAutoReply = BUSINESS_AUTOREPLY_PATTERNS.some(p => lowerText.includes(p));
-  if (isBusinessAutoReply) {
-    console.log(`🧹 [Auto-Respuesta / Prospección Externa Descartada] ${pushName} (${displayPhone}): "${text}". No se agrega a Firestore.`);
-    if (msgId) markMessageIdProcessed(msgId);
-    recordOutboundMessage(cleanPhone(phone) || remoteJid.split('@')[0], text);
-    return { saved: false, reason: 'business_autoreply_discarded' };
-  }
-
-  // 11. Detección real de Anuncio Meta Ads (CTWA)
-  const hasMetaAdReferral = !!(
-    msg.message?.extendedTextMessage?.contextInfo?.externalAdReply ||
-    msg.message?.extendedTextMessage?.contextInfo?.advertisementDetails ||
-    msg.message?.extendedTextMessage?.contextInfo?.referral ||
-    msg.message?.templateButtonReplyMessage
-  );
-
-  // === RAMA: CLIENTE INBOUND GENUINO (Clic en Anuncio de Meta Ads o Orgánico Web) ===
-  console.log(`🚀 [Lead Inbound Detectado!] (${contextSource}) De: ${pushName} | Tel: ${displayPhone} (JID: ${remoteJid}) - "${text}"`);
-
-  // B.1: Despacho a Meta CAPI (solo si viene por anuncio o inbound genuino)
-  const capiRes = await dispatchCapiBusinessMessagingLead({
-    phone: phone || displayPhone,
-    name: pushName,
-    remoteJid,
-    text
-  });
-
-  // B.2: Guardar en Firestore con source: 'whatsapp_auto'
-  const saved = await saveLeadToFirestore({
-    name: pushName,
-    phone,
-    displayPhone,
-    service: hasMetaAdReferral ? 'Anuncio Meta Ads WhatsApp' : 'Contacto Inicial WhatsApp',
-    notes: `Mensaje: "${text}"`,
-    source: 'whatsapp_auto',
-    eventId: capiRes?.eventId || `wa_${phone}_${Date.now()}`
-  });
-
-  if (saved) {
-    markPhoneProcessed(phone);
-    if (msgId) markMessageIdProcessed(msgId);
-  }
-
-  return { saved, source: 'whatsapp_auto' };
 }
 
 // Sincronización inteligente con Cloud Firestore (Anti-desperdicio de cuotas)
@@ -1033,28 +1108,17 @@ app.post('/api/webhook/whatsapp', async (req, res) => {
   const tenantId = req.query.tenant || req.query.client || body.tenantId || body.client || 'kindev';
 
   try {
-    const firestorePayload = {
-      fields: {
-        name: { stringValue: senderName },
-        phone: { stringValue: phone },
-        displayPhone: { stringValue: rawPhone },
-        service: { stringValue: 'Contacto Inicial WhatsApp' },
-        notes: { stringValue: messageText ? `Mensaje: "${messageText}"` : 'Auto-registrado' },
-        status: { stringValue: 'prospecto' },
-        amount: { doubleValue: 0 },
-        createdAt: { stringValue: new Date().toISOString() },
-        source: { stringValue: 'whatsapp_auto' },
-        tenantId: { stringValue: String(tenantId) }
-      }
-    };
-
-    const response = await fetch(FIRESTORE_REST_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(firestorePayload)
+    const saved = await saveLeadToFirestore({
+      name: senderName,
+      phone,
+      displayPhone: rawPhone,
+      service: 'Contacto Inicial WhatsApp',
+      notes: messageText ? `Mensaje: "${messageText}"` : 'Auto-registrado',
+      source: 'whatsapp_auto',
+      tenantId
     });
 
-    return res.status(200).json({ status: 'success', firestoreOk: response.ok });
+    return res.status(200).json({ status: 'success', saved });
   } catch (err) {
     return res.status(500).json({ error: err.message });
   }
