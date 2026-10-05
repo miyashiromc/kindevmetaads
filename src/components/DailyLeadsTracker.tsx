@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, useState } from 'react';
 import { 
   Calendar, 
   Clock, 
@@ -6,7 +6,10 @@ import {
   ArrowDownRight, 
   Minus,
   CheckCircle2,
-  X
+  X,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw
 } from 'lucide-react';
 import { Lead } from '../types';
 
@@ -71,16 +74,58 @@ export const DailyLeadsTracker: React.FC<DailyLeadsTrackerProps> = ({
   // Variación Hoy vs Ayer
   const difference = todayCount - yesterdayCount;
 
-  // Estructura de la semana en curso (Lunes a Domingo)
-  const weekData = useMemo(() => {
-    const monday = new Date(today);
-    const dayOfWeek = monday.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+  // Desplazamiento de semana: 0 = en curso, -1 = semana anterior, -2 = hace 2 semanas, etc.
+  const [weekOffset, setWeekOffset] = useState<number>(0);
+
+  // Semanas disponibles para el desplegable (semana actual y hasta 8 anteriores)
+  const availableWeeks = useMemo(() => {
+    const baseMonday = new Date(today);
+    const dayOfWeek = baseMonday.getDay();
     const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
-    monday.setDate(monday.getDate() + diffToMonday);
-    monday.setHours(0, 0, 0, 0);
+    baseMonday.setDate(baseMonday.getDate() + diffToMonday);
+    baseMonday.setHours(0, 0, 0, 0);
+
+    return [0, -1, -2, -3, -4, -5, -6, -7].map((offset) => {
+      const mon = new Date(baseMonday);
+      mon.setDate(baseMonday.getDate() + offset * 7);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+
+      const monStr = `${mon.getDate()} ${mon.toLocaleDateString('es-EC', { month: 'short' })}`;
+      const sunStr = `${sun.getDate()} ${sun.toLocaleDateString('es-EC', { month: 'short' })}`;
+
+      let label = `${monStr} - ${sunStr}`;
+      if (offset === 0) label = `Semana actual (${label})`;
+      else if (offset === -1) label = `Semana anterior (${label})`;
+      else label = `Hace ${Math.abs(offset)} semanas (${label})`;
+
+      return {
+        offset,
+        label,
+        startKey: toLocalDateKey(mon)!,
+        endKey: toLocalDateKey(sun)!
+      };
+    });
+  }, [today]);
+
+  // Estructura de la semana seleccionada (Lunes a Domingo)
+  const weekData = useMemo(() => {
+    const baseMonday = new Date(today);
+    const dayOfWeek = baseMonday.getDay(); // 0 = Domingo, 1 = Lunes, etc.
+    const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+    baseMonday.setDate(baseMonday.getDate() + diffToMonday);
+    baseMonday.setHours(0, 0, 0, 0);
+
+    const monday = new Date(baseMonday);
+    monday.setDate(baseMonday.getDate() + (weekOffset * 7));
 
     const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
+
+    const mondayKey = toLocalDateKey(monday)!;
+    const sundayKey = toLocalDateKey(sunday)!;
+    const weekFilterKey = `week:${mondayKey}:${sundayKey}`;
+    const isWeekSelected = selectedFilter === weekFilterKey;
 
     const days = [0, 1, 2, 3, 4, 5, 6].map((offset) => {
       const date = new Date(monday);
@@ -89,7 +134,7 @@ export const DailyLeadsTracker: React.FC<DailyLeadsTrackerProps> = ({
       const dayLeads = leadsByDay.get(key) || [];
       const isToday = key === todayKey;
       const isYesterday = key === yesterdayKey;
-      const isFuture = date.getTime() > today.getTime() && !isToday;
+      const isFuture = weekOffset >= 0 && date.getTime() > today.getTime() && !isToday;
 
       const dayNames = ['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'];
       const shortName = dayNames[date.getDay()];
@@ -116,16 +161,54 @@ export const DailyLeadsTracker: React.FC<DailyLeadsTrackerProps> = ({
     return {
       monday,
       sunday,
+      mondayKey,
+      sundayKey,
+      weekFilterKey,
+      isWeekSelected,
       days,
       totalWeek
     };
-  }, [today, todayKey, yesterdayKey, leadsByDay, selectedFilter]);
+  }, [today, todayKey, yesterdayKey, leadsByDay, selectedFilter, weekOffset]);
 
-  // Manejador de selección de filtro por tarjeta o día
+  // Cambiar offset de semana y activar automáticamente el filtro de esa semana para ver sus leads
+  const handleSelectWeekOffset = (newOffset: number) => {
+    setWeekOffset(newOffset);
+    const targetWeek = availableWeeks.find((w) => w.offset === newOffset);
+    if (targetWeek) {
+      onSelectFilter(`week:${targetWeek.startKey}:${targetWeek.endKey}`);
+    }
+  };
+
+  // Alternar filtro de toda la semana seleccionada
+  const handleToggleWeek = () => {
+    if (weekData.isWeekSelected) {
+      onSelectFilter('all');
+    } else {
+      onSelectFilter(weekData.weekFilterKey);
+    }
+  };
+
+  // Alternar selección de un día específico
+  const handleToggleDay = (dayKey: string) => {
+    if (selectedFilter === dayKey) {
+      if (weekOffset !== 0) {
+        onSelectFilter(weekData.weekFilterKey);
+      } else {
+        onSelectFilter('all');
+      }
+    } else {
+      onSelectFilter(dayKey);
+    }
+  };
+
+  // Manejador de selección de filtro por tarjeta Hoy o Ayer
   const handleToggleFilter = (filterKey: DateFilterType) => {
     if (selectedFilter === filterKey) {
       onSelectFilter('all');
     } else {
+      if (filterKey === 'today' && weekOffset !== 0) {
+        setWeekOffset(0);
+      }
       onSelectFilter(filterKey);
     }
   };
@@ -269,25 +352,102 @@ export const DailyLeadsTracker: React.FC<DailyLeadsTrackerProps> = ({
           </div>
         </div>
 
-        {/* ─── TARJETA 3: RITMO SEMANAL (Días de la semana actual con conteo diario) ─── */}
-        <div className="md:col-span-6 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between">
+        {/* ─── TARJETA 3: RITMO SEMANAL (Días de la semana con conteo diario y navegación) ─── */}
+        <div className="md:col-span-6 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between gap-2.5">
           
           {/* Header de la semana */}
-          <div className="flex items-center justify-between gap-2 mb-2.5 pb-2 border-b border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
             <div className="flex items-center gap-2">
-              <Calendar className="w-3.5 h-3.5 text-violet-600" />
+              <Calendar className="w-3.5 h-3.5 text-violet-600 shrink-0" />
               <span className="text-xs font-bold text-slate-900 tracking-tight">
                 Ritmo Semanal
               </span>
-              <span className="text-[11px] text-slate-500 font-medium hidden sm:inline">
+              <span className="text-[11px] text-slate-500 font-medium hidden lg:inline">
                 ({weekData.monday.getDate()} {weekData.monday.toLocaleDateString('es-EC', { month: 'short' })} - {weekData.sunday.getDate()} {weekData.sunday.toLocaleDateString('es-EC', { month: 'short' })})
               </span>
             </div>
 
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200/60">
-                {weekData.totalWeek} {weekData.totalWeek === 1 ? 'lead' : 'leads'} esta semana
-              </span>
+            {/* Controles de navegación de semana: Botón rápido, desplegable y total */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {/* Botón único para ir a la Semana Anterior o Volver a Semana Actual */}
+              {weekOffset === 0 ? (
+                <button
+                  type="button"
+                  onClick={() => handleSelectWeekOffset(-1)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200/80 transition-all active:scale-95 shadow-xs"
+                  title="Ver datos de la semana anterior"
+                >
+                  <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                  <span>Semana anterior</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => handleSelectWeekOffset(weekOffset - 1)}
+                    className="inline-flex items-center justify-center p-1 rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all active:scale-95"
+                    title="Semana previa anterior"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5" />
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => handleSelectWeekOffset(0)}
+                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 transition-all active:scale-95 shadow-xs"
+                    title="Regresar a la semana actual en vivo"
+                  >
+                    <span>Actual</span>
+                    <RotateCcw className="w-3 h-3" />
+                  </button>
+
+                  {weekOffset < -1 && (
+                    <button
+                      type="button"
+                      onClick={() => handleSelectWeekOffset(weekOffset + 1)}
+                      className="inline-flex items-center justify-center p-1 rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all active:scale-95"
+                      title="Semana siguiente"
+                    >
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              )}
+
+              {/* Selector desplegable de semanas anteriores */}
+              <select
+                value={weekOffset}
+                onChange={(e) => handleSelectWeekOffset(Number(e.target.value))}
+                className="text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-lg px-2 py-1 text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-violet-500 max-w-[145px] sm:max-w-none truncate"
+                title="Desplegar para ver semanas anteriores"
+              >
+                {availableWeeks.map((w) => (
+                  <option key={w.offset} value={w.offset}>
+                    {w.label}
+                  </option>
+                ))}
+              </select>
+
+              {/* Botón Badge Total de Leads de la Semana (Clic para filtrar toda la semana) */}
+              <button
+                type="button"
+                onClick={handleToggleWeek}
+                className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full transition-all flex items-center gap-1 cursor-pointer border ${
+                  weekData.isWeekSelected
+                    ? 'bg-violet-600 text-white border-violet-700 shadow-xs ring-2 ring-violet-500/20'
+                    : 'bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200/60'
+                }`}
+                title={weekData.isWeekSelected ? 'Haz clic para quitar filtro de semana' : 'Haz clic para ver toda esta semana en el panel'}
+              >
+                <span>{weekData.totalWeek} {weekData.totalWeek === 1 ? 'lead' : 'leads'}</span>
+                {weekData.isWeekSelected ? (
+                  <CheckCircle2 className="w-3 h-3 text-white" />
+                ) : (
+                  <span className="text-[10px] text-violet-500 font-sans font-medium hidden sm:inline">
+                    {weekOffset === 0 ? 'esta sem' : 'esa sem'}
+                  </span>
+                )}
+              </button>
             </div>
           </div>
 
@@ -300,7 +460,7 @@ export const DailyLeadsTracker: React.FC<DailyLeadsTrackerProps> = ({
                 <button
                   key={day.key}
                   type="button"
-                  onClick={() => !day.isFuture && handleToggleFilter(day.key)}
+                  onClick={() => !day.isFuture && handleToggleDay(day.key)}
                   disabled={day.isFuture}
                   className={`flex flex-col items-center justify-between py-2 px-1 rounded-xl transition-all select-none text-center ${
                     day.isFuture
@@ -392,6 +552,8 @@ export const DailyLeadsTracker: React.FC<DailyLeadsTrackerProps> = ({
                   ? `Hoy (${todayCount} leads)`
                   : selectedFilter === 'yesterday'
                   ? `Ayer (${yesterdayCount} leads)`
+                  : selectedFilter.startsWith('week:')
+                  ? `${weekOffset === 0 ? 'Semana actual' : weekOffset === -1 ? 'Semana anterior' : 'Semana'} (${weekData.monday.getDate()} ${weekData.monday.toLocaleDateString('es-EC', { month: 'short' })} - ${weekData.sunday.getDate()} ${weekData.sunday.toLocaleDateString('es-EC', { month: 'short' })}) • ${weekData.totalWeek} leads`
                   : `Fecha ${selectedFilter}`}
               </strong>
             </span>

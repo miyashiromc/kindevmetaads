@@ -106,6 +106,14 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
         result = result.filter((l) => toLocalDateKey(l.createdAt) === todayKey);
       } else if (dateFilter === 'yesterday') {
         result = result.filter((l) => toLocalDateKey(l.createdAt) === yesterdayKey);
+      } else if (dateFilter.startsWith('week:')) {
+        const parts = dateFilter.split(':');
+        const startKey = parts[1];
+        const endKey = parts[2];
+        result = result.filter((l) => {
+          const k = toLocalDateKey(l.createdAt);
+          return k !== null && k >= startKey && k <= endKey;
+        });
       } else {
         result = result.filter((l) => toLocalDateKey(l.createdAt) === dateFilter);
       }
