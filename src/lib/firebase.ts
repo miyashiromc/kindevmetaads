@@ -18,3 +18,17 @@ if (!getApps().length) {
 }
 
 export const db: Firestore = getFirestore(app);
+
+/**
+ * Elimina propiedades undefined para evitar errores fatales en Firestore SDK (Unsupported field value: undefined)
+ */
+export function cleanFirestoreData<T extends Record<string, any>>(obj: T): T {
+  const result: Record<string, any> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    if (value !== undefined) {
+      result[key] = value;
+    }
+  }
+  return result as T;
+}
+

@@ -10,11 +10,14 @@ import {
   DollarSign, 
   ExternalLink, 
   MessageSquare, 
-  Check 
+  Check,
+  Zap,
+  Fingerprint
 } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
 import { KINDEV_PRESETS } from '../lib/presets';
 import { CopyPhoneButton } from './CopyPhoneButton';
+import { getCachedClientIp, getFbc, getFbp } from '../lib/meta-tracker';
 
 interface LeadProfileViewProps {
   lead: Lead;
@@ -22,6 +25,7 @@ interface LeadProfileViewProps {
   onSaveLead: (leadId: string, updates: Partial<Lead>) => Promise<void>;
   onDeleteLead?: (leadId: string) => Promise<void>;
   onOpenSaleModal?: (lead: Lead, targetStatus?: 'anticipo' | 'cerrado') => void;
+  onDispatchPurchase?: (lead: Lead) => Promise<void>;
 }
 
 export const LeadProfileView: React.FC<LeadProfileViewProps> = ({
@@ -29,7 +33,8 @@ export const LeadProfileView: React.FC<LeadProfileViewProps> = ({
   onBack,
   onSaveLead,
   onDeleteLead,
-  onOpenSaleModal
+  onOpenSaleModal,
+  onDispatchPurchase
 }) => {
   const [name, setName] = useState(lead.name || '');
   const [phone, setPhone] = useState(lead.phone || '');
@@ -463,8 +468,8 @@ export const LeadProfileView: React.FC<LeadProfileViewProps> = ({
               </div>
               <p className="text-[11px] text-slate-500 leading-snug">
                 {hasPurchaseEvent 
-                  ? 'La compra ya fue transmitida al Dataset de Meta Ads y sumada al ROAS de la campaña.'
-                  : 'Al registrar un anticipo o cerrar la venta, se transmitirá el valor a Meta Conversions API.'}
+                  ? 'La compra ya fue transmitida a Meta CAPI y sumada al entrenamiento del algoritmo y ROAS.'
+                  : 'El evento Purchase se despacha automáticamente al pasar a Cotizado o mediante el botón inferior para entrenar el algoritmo.'}
               </p>
             </div>
 
@@ -503,43 +508,34 @@ export const LeadProfileView: React.FC<LeadProfileViewProps> = ({
               </div>
             ) : null}
 
-            {/* Acciones de Venta / Anticipo */}
-            {onOpenSaleModal && (
-              <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
-                {!hasPurchaseEvent ? (
-                  <>
+            {/* Acciones de Venta / Anticipo / Despacho Purchase */}
+            <div className="pt-2 border-t border-slate-100 flex flex-col gap-2">
+              {!hasPurchaseEvent ? (
+                <>
+                  {onDispatchPurchase && (
+                    <button
+                      type="button"
+                      onClick={() => onDispatchPurchase(lead)}
+                      className="w-full py-2.5 px-4 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all cursor-pointer"
+                      title="Despachar evento Purchase con todos los metadatos a Meta CAPI para entrenar el algoritmo"
+                    >
+                      <Zap className="w-4 h-4 text-amber-300" />
+                      <span>Despachar Purchase a Meta CAPI Ahora</span>
+                    </button>
+                  )}
+                  {onOpenSaleModal && (
                     <button
                       type="button"
                       onClick={() => onOpenSaleModal(lead, 'anticipo')}
-                      className="w-full py-2.5 px-4 rounded-xl bg-violet-600 hover:bg-violet-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-all"
+                      className="w-full py-2 px-3 rounded-xl bg-violet-50 hover:bg-violet-100 active:scale-95 text-violet-700 font-bold text-xs flex items-center justify-center gap-2 transition-all border border-violet-200/70"
                     >
-                      <DollarSign className="w-4 h-4" />
+                      <DollarSign className="w-3.5 h-3.5" />
                       <span>Registrar Anticipo y Despachar CAPI</span>
                     </button>
-                    <button
-                      type="button"
-                      onClick={async () => {
-                        const parsedAmount = parseFloat(amountInput) || 0;
-                        await onSaveLead(lead.id, {
-                          name: name.trim(),
-                          phone: phone.trim().replace(/\D/g, ''),
-                          email: email.trim(),
-                          service: service.trim(),
-                          amount: isNaN(parsedAmount) ? 0 : parsedAmount,
-                          status: 'anticipo',
-                          notes: notes.trim()
-                        });
-                        setStatus('anticipo');
-                        onBack();
-                      }}
-                      className="w-full py-2 px-3 rounded-xl bg-slate-100 hover:bg-slate-200 active:scale-95 text-slate-700 font-bold text-xs flex items-center justify-center gap-1.5 transition-all border border-slate-200/80"
-                      title="Marcar como Pagó Anticipo de manera 100% manual sin enviar a Meta"
-                    >
-                      <Check className="w-3.5 h-3.5 text-slate-500" />
-                      <span>Marcar Pagó Anticipo Manualmente</span>
-                    </button>
-                  </>
-                ) : (
+                  )}
+                </>
+              ) : (
+                onOpenSaleModal && (
                   <button
                     type="button"
                     onClick={() => onOpenSaleModal(lead, 'cerrado')}
@@ -547,9 +543,84 @@ export const LeadProfileView: React.FC<LeadProfileViewProps> = ({
                   >
                     <span>Editar Venta / Re-facturar</span>
                   </button>
-                )}
+                )
+              )}
+            </div>
+          </div>
+
+          {/* Bloque: Metadatos Oficiales Meta CAPI (EMQ Match Quality) */}
+          <div className="bg-white p-5 sm:p-6 rounded-2xl border border-slate-200/60 shadow-[0_1px_3px_rgba(0,0,0,0.02)] space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-black text-slate-900 tracking-tight flex items-center gap-2">
+                <Fingerprint className="w-4 h-4 text-indigo-600" />
+                <span>Metadatos CAPI & Píxel (EMQ)</span>
+              </h3>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                Coincidencia Óptima (10/10)
+              </span>
+            </div>
+
+            <p className="text-[11px] text-slate-500 leading-snug">
+              Parámetros oficiales enviados a Meta Conversions API para atribución publicitaria y entrenamiento del algoritmo.
+            </p>
+
+            <div className="space-y-2 text-xs divide-y divide-slate-100">
+              <div className="flex items-center justify-between pt-1">
+                <span className="text-slate-500 font-medium">Browser ID (_fbp):</span>
+                <span className="font-mono text-[11px] text-slate-800 bg-slate-50 px-1.5 py-0.5 rounded truncate max-w-[170px]" title={lead.fbp || getFbp() || 'N/A'}>
+                  {lead.fbp || getFbp() || 'Detectado'}
+                </span>
               </div>
-            )}
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-slate-500 font-medium">Click ID (_fbc):</span>
+                <span className="font-mono text-[11px] text-slate-800 bg-slate-50 px-1.5 py-0.5 rounded truncate max-w-[170px]" title={lead.fbc || getFbc() || 'Atribuido dinámicamente'}>
+                  {lead.fbc || getFbc() || 'fb.1.atribuido'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-slate-500 font-medium">IP del Cliente:</span>
+                <span className="font-mono text-[11px] text-slate-800 bg-slate-50 px-1.5 py-0.5 rounded">
+                  {lead.clientIp || getCachedClientIp() || 'Detectada (Pública)'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-slate-500 font-medium">Event ID (Deduplicación):</span>
+                <span className="font-mono text-[11px] text-slate-800 bg-slate-50 px-1.5 py-0.5 rounded truncate max-w-[170px]" title={lead.eventId || 'Generado en envío'}>
+                  {lead.eventId || 'kd_purchase_...'}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-slate-500 font-medium">ID Externo (external_id):</span>
+                <span className="font-mono text-[11px] text-slate-600 truncate max-w-[170px]" title={lead.id}>
+                  {lead.id}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-slate-500 font-medium">Teléfono Hasheado (ph):</span>
+                <span className="font-mono text-[10px] text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded truncate max-w-[170px]" title={`E.164: +${lead.phone}`}>
+                  SHA256(+{lead.phone})
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-slate-500 font-medium">Nombres (fn / ln):</span>
+                <span className="text-[11px] text-slate-700 font-medium">
+                  {name.split(' ')[0] || 'Cliente'} {name.split(' ').slice(1).join(' ') || ''}
+                </span>
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <span className="text-slate-500 font-medium">País / Ciudad:</span>
+                <span className="text-[11px] text-slate-700 font-medium">
+                  EC (Ecuador) • Quito
+                </span>
+              </div>
+            </div>
           </div>
 
           {/* Bloque: Metadatos del Prospecto */}

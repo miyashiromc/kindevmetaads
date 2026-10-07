@@ -190,21 +190,34 @@ export const LeadCard: React.FC<LeadCardProps> = ({ lead, onOpenSale, onUpdateSt
           </p>
         )}
 
-        {/* Historial de Eventos Meta CAPI */}
-        {lead.metaEvents && lead.metaEvents.length > 0 && (
-          <div className="pt-0.5 flex items-center gap-1.5 flex-wrap">
-            {lead.metaEvents.map((evt, idx) => (
-              <span
-                key={idx}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono bg-violet-50 text-violet-700 border border-violet-200/70"
-                title={`fbtrace_id: ${evt.fbtraceId || 'N/A'}`}
-              >
-                <span className="w-1.5 h-1.5 rounded-full bg-violet-600"></span>
-                Meta CAPI: {evt.eventName} {evt.amount ? `($${Number(evt.amount).toFixed(2)})` : ''}
-              </span>
-            ))}
-          </div>
-        )}
+        {/* Historial de Eventos Meta CAPI y Metadatos de Atribución */}
+        <div className="pt-0.5 flex items-center gap-1.5 flex-wrap">
+          {lead.metaEvents && lead.metaEvents.length > 0 && lead.metaEvents.map((evt, idx) => (
+            <span
+              key={idx}
+              className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-mono border ${
+                evt.eventName === 'Purchase' 
+                  ? 'bg-emerald-50 text-emerald-700 border-emerald-200/80 font-bold' 
+                  : 'bg-violet-50 text-violet-700 border border-violet-200/70'
+              }`}
+              title={`fbtrace_id: ${evt.fbtraceId || 'N/A'}`}
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${evt.eventName === 'Purchase' ? 'bg-emerald-600' : 'bg-violet-600'}`}></span>
+              Meta CAPI: {evt.eventName} {evt.amount ? `($${Number(evt.amount).toFixed(2)})` : ''}
+            </span>
+          ))}
+
+          {(lead.fbc || lead.fbp) && (
+            <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono bg-violet-50 text-violet-700 border border-violet-200/60" title="Atribución Click ID y Browser ID">
+              {lead.fbc ? 'fbc' : ''}{lead.fbc && lead.fbp ? ' • ' : ''}{lead.fbp ? 'fbp' : ''}
+            </span>
+          )}
+          {lead.clientIp && (
+            <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-100 text-slate-600" title={`IP: ${lead.clientIp}`}>
+              IP: {lead.clientIp}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* Acciones (Ergonómicas al Alcance del Pulgar en Móvil) */}

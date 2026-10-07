@@ -15,4 +15,5 @@ outbound_tracker.json
 auth_baileys/
 logs/
 *.log
+scratch/
 

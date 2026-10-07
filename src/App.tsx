@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { collection, doc, addDoc, updateDoc, deleteDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { Search, Filter, ChevronLeft, ChevronRight } from 'lucide-react';
-import { db } from './lib/firebase';
+import { db, cleanFirestoreData } from './lib/firebase';
 import { 
   Lead, 
   LeadStatus, 
@@ -15,7 +15,7 @@ import {
   SystemApisStatus
 } from './types';
 import { dispatchMetaCAPI } from './lib/meta-capi';
-import { getFbc, getFbp, generateEventId, trackPixelEvent } from './lib/meta-tracker';
+import { getFbc, getFbp, generateEventId, trackPixelEvent, getClientIp, getCachedClientIp, captureAndStoreFbclid } from './lib/meta-tracker';
 import { SecurityGate } from './components/SecurityGate';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
@@ -223,6 +223,11 @@ export const App: React.FC = () => {
     window.addEventListener('hashchange', handleHashSync);
     window.addEventListener('popstate', handleHashSync);
 
+    // Inicializar rastreo y metadatos oficiales de Meta CAPI
+    captureAndStoreFbclid();
+    getFbp();
+    getClientIp();
+
     // Si entra a la página sin hash, asignar el hash por defecto correspondiente
     if (typeof window !== 'undefined') {
       if (!window.location.hash) {
@@ -298,7 +303,12 @@ export const App: React.FC = () => {
               source: data.source,
               adSource: data.adSource || '',
               tenantId: data.tenantId || 'kindev',
-              metaEvents: Array.isArray(data.metaEvents) ? data.metaEvents : []
+              metaEvents: Array.isArray(data.metaEvents) ? data.metaEvents : [],
+              eventId: data.eventId,
+              fbc: data.fbc,
+              fbp: data.fbp,
+              clientIp: data.clientIp,
+              clientUserAgent: data.clientUserAgent
             };
 
             const cleanPh = (leadItem.phone || '').replace(/\D/g, '');
@@ -614,7 +624,7 @@ export const App: React.FC = () => {
 
       const leadEventId = generateEventId('lead');
 
-      const newLeadData = {
+      const newLeadData = cleanFirestoreData({
         name: data.name,
         phone: data.phone,
         displayPhone: data.phone,
@@ -627,10 +637,10 @@ export const App: React.FC = () => {
         tenantId: activeTenantId,
         metaEvents: initialEvents,
         eventId: leadEventId,
-        fbc,
-        fbp,
+        ...(fbc ? { fbc } : {}),
+        ...(fbp ? { fbp } : {}),
         ...(isClosed ? { saleDate: new Date().toISOString() } : {})
-      };
+      });
 
       if (firestoreConnected) {
         await addDoc(collection(db, 'leads'), newLeadData);
@@ -675,7 +685,110 @@ export const App: React.FC = () => {
   const handleUpdateStatus = async (id: string, newStatus: LeadStatus) => {
     try {
       const target = leads.find((l) => l.id === id);
-      const hadPurchase = target?.metaEvents?.some((e) => e.eventName === 'Purchase');
+      if (!target) return;
+      const hadPurchase = target.metaEvents?.some((e) => e.eventName === 'Purchase');
+
+      // 1. Si pasa a "cotizado" y no tiene Purchase enviado previamente, despachar evento Purchase con todos los metadatos para entrenar algoritmo de Meta
+      if (newStatus === 'cotizado' && !hadPurchase) {
+        let finalAmount = target.amount > 0 ? target.amount : 0;
+        if (finalAmount === 0) {
+          const s = (target.service || '').toLowerCase();
+          if (s.includes('e-commerce') || s.includes('tienda')) finalAmount = 600;
+          else if (s.includes('landing')) finalAmount = 60;
+          else if (s.includes('saas') || s.includes('plataforma')) finalAmount = 400;
+          else if (s.includes('260')) finalAmount = 260;
+          else finalAmount = 120; // Tarifa base Kindev
+        }
+
+        const purchaseEventId = generateEventId('purchase');
+        const fbc = target.fbc || getFbc() || undefined;
+        const fbp = target.fbp || getFbp() || undefined;
+        const clientIp = target.clientIp || getCachedClientIp() || undefined;
+        const clientUserAgent = target.clientUserAgent || (typeof navigator !== 'undefined' ? navigator.userAgent : undefined);
+
+        // Disparar en Píxel del navegador con deduplicación por eventId
+        trackPixelEvent('Purchase', { value: finalAmount, currency: 'USD', content_name: target.service }, purchaseEventId);
+
+        const tenantMetaCreds = activeTenantId !== 'kindev' && activeTenant?.metaConfig?.datasetId
+          ? {
+              datasetId: activeTenant.metaConfig.datasetId,
+              accessToken: activeTenant.metaConfig.accessToken
+            }
+          : undefined;
+
+        let capiTrace = 'despachado';
+        try {
+          const capiRes = await dispatchMetaCAPI(
+            {
+              eventName: 'Purchase',
+              phone: target.phone,
+              name: target.name,
+              email: target.email,
+              value: finalAmount,
+              currency: 'USD',
+              service: target.service,
+              leadId: target.id,
+              eventId: purchaseEventId,
+              actionSource: 'website',
+              fbc,
+              fbp,
+              clientIp,
+              clientUserAgent,
+              testMode: activeTenant.metaConfig.testMode,
+              testEventCode: activeTenant.metaConfig.testEventCode
+            },
+            tenantMetaCreds
+          );
+          capiTrace = capiRes.fbtraceId;
+        } catch (capiErr) {
+          console.warn('Aviso Meta CAPI al cotizar:', capiErr);
+        }
+
+        const newMetaEvent: MetaEventRecord = {
+          eventName: 'Purchase',
+          amount: finalAmount,
+          currency: 'USD',
+          date: new Date().toISOString(),
+          fbtraceId: capiTrace,
+          eventId: purchaseEventId,
+          actionSource: 'website',
+          testMode: activeTenant.metaConfig.testMode
+        };
+
+        const updatedEvents = [...(target.metaEvents || []), newMetaEvent];
+        const updates: Partial<Lead> = {
+          status: 'cotizado',
+          amount: finalAmount,
+          metaEvents: updatedEvents,
+          eventId: purchaseEventId,
+          ...(fbc ? { fbc } : {}),
+          ...(fbp ? { fbp } : {}),
+          ...(clientIp ? { clientIp } : {}),
+          ...(clientUserAgent ? { clientUserAgent } : {})
+        };
+
+        if (firestoreConnected) {
+          const leadRef = doc(db, 'leads', id);
+          await updateDoc(leadRef, updates);
+        } else {
+          const updated = leads.map((l) => (l.id === id ? { ...l, ...updates } : l));
+          setLeads(updated);
+          localStorage.setItem(FALLBACK_STORAGE_KEY, JSON.stringify(updated));
+        }
+
+        setProfileLead((prev) => (prev && prev.id === id ? { ...prev, ...updates } : prev));
+        showToast(`🎉 ¡"${target.name}" marcado como Cotizado y Purchase ($${finalAmount.toFixed(2)} USD) despachado a Meta CAPI con todos los metadatos!`, 'success');
+        return;
+      }
+
+      // Si pasa a anticipo o cerrado y no tiene Purchase enviado previamente, abrir modal de venta para registrar monto y despachar a Meta CAPI
+      if ((newStatus === 'anticipo' || newStatus === 'cerrado') && !hadPurchase) {
+        setProfileLead(null);
+        setSaleLead(target);
+        setSaleTargetStatus(newStatus);
+        return;
+      }
+
       const now = new Date().toISOString();
       const updates: { status: LeadStatus; saleDate?: string } = { status: newStatus };
       if ((newStatus === 'anticipo' || newStatus === 'cerrado') && !target?.saleDate) {
@@ -694,7 +807,7 @@ export const App: React.FC = () => {
       setProfileLead((prev) => (prev && prev.id === id ? { ...prev, ...updates } : prev));
 
       if (newStatus === 'cerrado' && hadPurchase) {
-        showToast('Proyecto marcado como Entregado / Cerrado (Purchase ya enviado a Meta en anticipo)', 'success');
+        showToast('Proyecto marcado como Entregado / Cerrado (Purchase ya enviado a Meta en cotización/anticipo)', 'success');
       } else {
         showToast(`Estado cambiado a: ${newStatus}`, 'info');
       }
@@ -702,6 +815,111 @@ export const App: React.FC = () => {
       const msg = err instanceof Error ? err.message : 'Error al actualizar estado';
       showToast(msg, 'error');
     }
+  };
+
+  const handleSyncAllCotizadosToPurchase = async () => {
+    const pendingCotizados = leads.filter(
+      (l) => l.status === 'cotizado' && !l.metaEvents?.some((e) => e.eventName === 'Purchase')
+    );
+
+    if (pendingCotizados.length === 0) {
+      showToast('Todos los prospectos en estado Cotizado ya tienen evento Purchase enviado a Meta CAPI.', 'info');
+      return;
+    }
+
+    showToast(`Despachando evento Purchase a Meta CAPI para ${pendingCotizados.length} cotizados pendientes...`, 'info');
+
+    let countSuccess = 0;
+    for (const item of pendingCotizados) {
+      try {
+        let finalAmount = item.amount > 0 ? item.amount : 0;
+        if (finalAmount === 0) {
+          const s = (item.service || '').toLowerCase();
+          if (s.includes('e-commerce') || s.includes('tienda')) finalAmount = 600;
+          else if (s.includes('landing')) finalAmount = 60;
+          else if (s.includes('saas') || s.includes('plataforma')) finalAmount = 400;
+          else if (s.includes('260')) finalAmount = 260;
+          else finalAmount = 120;
+        }
+
+        const purchaseEventId = generateEventId('purchase');
+        const fbc = item.fbc || getFbc() || undefined;
+        const fbp = item.fbp || getFbp() || undefined;
+        const clientIp = item.clientIp || getCachedClientIp() || undefined;
+        const clientUserAgent = item.clientUserAgent || (typeof navigator !== 'undefined' ? navigator.userAgent : undefined);
+
+        trackPixelEvent('Purchase', { value: finalAmount, currency: 'USD', content_name: item.service }, purchaseEventId);
+
+        const tenantMetaCreds = activeTenantId !== 'kindev' && activeTenant?.metaConfig?.datasetId
+          ? {
+              datasetId: activeTenant.metaConfig.datasetId,
+              accessToken: activeTenant.metaConfig.accessToken
+            }
+          : undefined;
+
+        let traceId = 'batch_capi';
+        try {
+          const res = await dispatchMetaCAPI(
+            {
+              eventName: 'Purchase',
+              phone: item.phone,
+              name: item.name,
+              email: item.email,
+              value: finalAmount,
+              currency: 'USD',
+              service: item.service,
+              leadId: item.id,
+              eventId: purchaseEventId,
+              actionSource: 'website',
+              fbc,
+              fbp,
+              clientIp,
+              clientUserAgent,
+              testMode: activeTenant.metaConfig.testMode,
+              testEventCode: activeTenant.metaConfig.testEventCode
+            },
+            tenantMetaCreds
+          );
+          traceId = res.fbtraceId;
+        } catch (err) {
+          console.warn('Aviso CAPI en batch para lead:', item.name, err);
+        }
+
+        const newMetaEvent: MetaEventRecord = {
+          eventName: 'Purchase',
+          amount: finalAmount,
+          currency: 'USD',
+          date: new Date().toISOString(),
+          fbtraceId: traceId,
+          eventId: purchaseEventId,
+          actionSource: 'website',
+          testMode: activeTenant.metaConfig.testMode
+        };
+
+        const updatedEvents = [...(item.metaEvents || []), newMetaEvent];
+        const updates: Partial<Lead> = {
+          amount: finalAmount,
+          metaEvents: updatedEvents,
+          eventId: purchaseEventId,
+          ...(fbc ? { fbc } : {}),
+          ...(fbp ? { fbp } : {}),
+          ...(clientIp ? { clientIp } : {}),
+          ...(clientUserAgent ? { clientUserAgent } : {})
+        };
+
+        if (firestoreConnected) {
+          const leadRef = doc(db, 'leads', item.id);
+          await updateDoc(leadRef, updates);
+        } else {
+          setLeads((prev) => prev.map((l) => (l.id === item.id ? { ...l, ...updates } : l)));
+        }
+        countSuccess++;
+      } catch (e) {
+        console.error('Error sincronizando lead:', item.id, e);
+      }
+    }
+
+    showToast(`✅ ¡${countSuccess} de ${pendingCotizados.length} cotizados sincronizados exitosamente con Meta CAPI (Purchase)! Algoritmo entrenado.`, 'success');
   };
 
   const handleUpdateLeadName = async (id: string, newName: string) => {
@@ -733,7 +951,7 @@ export const App: React.FC = () => {
 
       if (firestoreConnected) {
         const leadRef = doc(db, 'leads', leadId);
-        await updateDoc(leadRef, finalUpdates);
+        await updateDoc(leadRef, cleanFirestoreData(finalUpdates));
       } else {
         const updated = leads.map((l) => (l.id === leadId ? { ...l, ...finalUpdates } : l));
         setLeads(updated);
@@ -1110,6 +1328,9 @@ export const App: React.FC = () => {
               onBack={() => setProfileLead(null)}
               onSaveLead={handleSaveLeadProfile}
               onDeleteLead={handleDelete}
+              onDispatchPurchase={async (l) => {
+                await handleUpdateStatus(l.id, 'cotizado');
+              }}
               onOpenSaleModal={(l, targetStatus) => {
                 setProfileLead(null);
                 setSaleLead(l);
@@ -1123,6 +1344,7 @@ export const App: React.FC = () => {
           <KanbanBoard
             leads={tenantLeads}
             onUpdateStatus={handleUpdateStatus}
+            onSyncAllCotizados={handleSyncAllCotizadosToPurchase}
             onOpenSaleModal={(lead, targetStatus = 'cerrado') => {
               setSaleLead(lead);
               setSaleTargetStatus(targetStatus);
@@ -1257,7 +1479,10 @@ export const App: React.FC = () => {
                       <LeadCard
                         key={lead.id}
                         lead={lead}
-                        onOpenSale={(l) => setSaleLead(l)}
+                        onOpenSale={(l) => {
+                          setSaleLead(l);
+                          setSaleTargetStatus('cerrado');
+                        }}
                         onUpdateStatus={handleUpdateStatus}
                         onDelete={handleDelete}
                         onUpdateName={handleUpdateLeadName}

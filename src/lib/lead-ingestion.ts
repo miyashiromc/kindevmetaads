@@ -1,5 +1,5 @@
 import { collection, addDoc, getDocs, query, where } from 'firebase/firestore';
-import { db } from './firebase';
+import { db, cleanFirestoreData } from './firebase';
 import { formatPhoneNumber, dispatchMetaCAPI } from './meta-capi';
 import { getFbc, getFbp, generateEventId, trackPixelEvent } from './meta-tracker';
 import { LeadStatus } from '../types';
@@ -48,7 +48,7 @@ export async function ingestIncomingLead(
     const fbp = getFbp() || undefined;
     const actionSource = payload.source === 'whatsapp_auto' ? 'business_messaging' : 'website';
 
-    const newLead = {
+    const newLead = cleanFirestoreData({
       name: payload.name?.trim() || 'Cliente WhatsApp',
       phone: cleanPhone,
       displayPhone: payload.phone.trim(),
@@ -61,9 +61,9 @@ export async function ingestIncomingLead(
       tenantId: payload.tenantId || 'kindev',
       metaEvents: [],
       eventId,
-      fbc,
-      fbp
-    };
+      ...(fbc ? { fbc } : {}),
+      ...(fbp ? { fbp } : {})
+    });
 
     const docRef = await addDoc(leadsRef, newLead);
 

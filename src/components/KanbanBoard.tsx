@@ -11,7 +11,8 @@ import {
   DollarSign,
   Pencil,
   Check,
-  X
+  X,
+  Zap
 } from 'lucide-react';
 import { Lead, LeadStatus } from '../types';
 import { CopyPhoneButton } from './CopyPhoneButton';
@@ -20,6 +21,7 @@ import { DailyLeadsTracker, DateFilterType, toLocalDateKey } from './DailyLeadsT
 interface KanbanBoardProps {
   leads: Lead[];
   onUpdateStatus: (leadId: string, newStatus: LeadStatus) => Promise<void>;
+  onSyncAllCotizados?: () => Promise<void>;
   onOpenSaleModal: (lead: Lead, targetStatus?: 'anticipo' | 'cerrado') => void;
   onOpenLeadProfile: (lead: Lead) => void;
   onAddNewLead: () => void;
@@ -52,7 +54,7 @@ const COLUMNS: ColumnConfig[] = [
     badgeBg: 'bg-blue-50 text-blue-800',
     borderColor: 'border-blue-200',
     dotColor: 'bg-blue-500',
-    description: 'Propuesta enviada • En seguimiento'
+    description: 'Propuesta enviada • Purchase a Meta CAPI'
   },
   {
     status: 'anticipo',
@@ -60,7 +62,7 @@ const COLUMNS: ColumnConfig[] = [
     badgeBg: 'bg-violet-50 text-violet-900',
     borderColor: 'border-violet-200',
     dotColor: 'bg-violet-500',
-    description: 'Cliente asegurado • Purchase enviado a Meta'
+    description: 'Cliente asegurado • En desarrollo'
   },
   {
     status: 'cerrado',
@@ -75,6 +77,7 @@ const COLUMNS: ColumnConfig[] = [
 export const KanbanBoard: React.FC<KanbanBoardProps> = ({
   leads,
   onUpdateStatus,
+  onSyncAllCotizados,
   onOpenSaleModal,
   onOpenLeadProfile,
   onAddNewLead,
@@ -369,6 +372,32 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
               "{lead.notes.split('\n').filter(Boolean).pop() || lead.notes}"
             </p>
           )}
+
+          {/* Indicadores Meta Ads CAPI (Purchase, FBC, FBP, IP) */}
+          <div className="pt-1 flex items-center gap-1.5 flex-wrap">
+            {lead.metaEvents?.some((ev) => ev.eventName === 'Purchase') ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200/80">
+                <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                Purchase CAPI ✓
+              </span>
+            ) : lead.status === 'cotizado' ? (
+              <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200/80">
+                <Zap className="w-2.5 h-2.5 text-amber-600" />
+                Purchase Pendiente
+              </span>
+            ) : null}
+
+            {(lead.fbc || lead.fbp) && (
+              <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[9px] font-mono bg-violet-50 text-violet-700 border border-violet-200/60" title="Atribución Click ID y Browser ID presente">
+                {lead.fbc ? 'fbc' : ''}{lead.fbc && lead.fbp ? ' • ' : ''}{lead.fbp ? 'fbp' : ''}
+              </span>
+            )}
+            {lead.clientIp && (
+              <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[9px] font-mono bg-slate-100 text-slate-600" title={`IP: ${lead.clientIp}`}>
+                IP ✓
+              </span>
+            )}
+          </div>
         </div>
 
         {/* Controles de Avance Ergonómicos (Sin Box-in-Box) */}
@@ -399,7 +428,7 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                 }
               }}
               className="flex-1 h-8 px-3 rounded-lg bg-violet-600 hover:bg-violet-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
-              title="Registrar cobro de anticipo y despachar Purchase a Meta"
+              title="Registrar cobro de anticipo"
             >
               <DollarSign className="w-3.5 h-3.5" />
               <span>Pagó Anticipo ➔</span>
@@ -425,10 +454,11 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
             <button
               type="button"
               onClick={() => onUpdateStatus(lead.id, 'cotizado')}
-              className="flex-1 h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95"
-              title="Marcar como Cotizado y pasar a la siguiente etapa comercial"
+              className="flex-1 h-8 px-3 rounded-lg bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all active:scale-95 cursor-pointer"
+              title="Marcar como Cotizado y despachar evento Purchase con todos los metadatos a Meta CAPI para entrenar el algoritmo"
             >
-              <span>Cotizado ➔</span>
+              <Zap className="w-3.5 h-3.5 text-amber-300" />
+              <span>Cotizar & Purchase ➔</span>
             </button>
           ) : (
             <button
@@ -610,6 +640,22 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
           </div>
         </div>
 
+        {activeMobileColumn.status === 'cotizado' && onSyncAllCotizados && (
+          (() => {
+            const pendingCount = activeMobileLeads.filter(l => !l.metaEvents?.some(e => e.eventName === 'Purchase')).length;
+            return pendingCount > 0 ? (
+              <button
+                type="button"
+                onClick={() => onSyncAllCotizados()}
+                className="w-full py-2 px-3 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              >
+                <Zap className="w-3.5 h-3.5 text-amber-300" />
+                <span>Enviar Purchase CAPI a Cotizados ({pendingCount} pendientes)</span>
+              </button>
+            ) : null;
+          })()
+        )}
+
         {/* Lista Vertical Fluida de Tarjetas para Móvil (Cero Scroll Trapping) */}
         <div className="space-y-3 pb-8">
           {activeMobileLeads.length === 0 ? (
@@ -678,6 +724,26 @@ export const KanbanBoard: React.FC<KanbanBoardProps> = ({
                     </span>
                   )}
                 </div>
+
+                {col.status === 'cotizado' && onSyncAllCotizados && (
+                  (() => {
+                    const pendingCount = colLeads.filter(l => !l.metaEvents?.some(e => e.eventName === 'Purchase')).length;
+                    return pendingCount > 0 ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onSyncAllCotizados();
+                        }}
+                        className="mt-2 w-full py-1.5 px-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 active:scale-95 text-white font-bold text-[11px] flex items-center justify-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                        title="Despachar evento Purchase a Meta Conversions API para todos los cotizados pendientes"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-300" />
+                        <span>Despachar Purchase ({pendingCount})</span>
+                      </button>
+                    ) : null;
+                  })()
+                )}
               </div>
 
               {/* Área de Tarjetas con Scroll Vertical */}

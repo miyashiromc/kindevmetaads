@@ -134,3 +134,32 @@ export function trackPixelEvent(
     };
   }
 }
+
+/**
+ * Obtiene la IP pública del cliente para Meta CAPI (cacheada en sessionStorage/localStorage)
+ */
+export function getCachedClientIp(): string | null {
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem('kindev_client_ip') || localStorage.getItem('kindev_client_ip') || null;
+}
+
+export async function getClientIp(): Promise<string | null> {
+  if (typeof window === 'undefined') return null;
+  const cached = getCachedClientIp();
+  if (cached) return cached;
+
+  try {
+    const res = await fetch('https://api.ipify.org?format=json', { signal: AbortSignal.timeout(2500) });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.ip) {
+        sessionStorage.setItem('kindev_client_ip', data.ip);
+        localStorage.setItem('kindev_client_ip', data.ip);
+        return data.ip;
+      }
+    }
+  } catch {
+    // Silencioso ante fallos de red
+  }
+  return null;
+}
