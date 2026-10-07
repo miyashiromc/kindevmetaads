@@ -36,9 +36,12 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
   const [telemetry, setTelemetry] = React.useState(() => userTelemetry.getReport());
 
   React.useEffect(() => {
-    const interval = setInterval(() => {
-      setTelemetry(userTelemetry.getReport());
-    }, 2500);
+    const updateReport = () => {
+      if (typeof document !== 'undefined' && !document.hidden) {
+        setTelemetry(userTelemetry.getReport());
+      }
+    };
+    const interval = setInterval(updateReport, 10000); // Polling relajado cada 10s en memoria
     return () => clearInterval(interval);
   }, []);
 

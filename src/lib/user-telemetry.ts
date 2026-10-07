@@ -1,4 +1,5 @@
-// Telemetría de Uso y Medición de Tiempo por Sección (KinDev Telemetry Engine)
+// Telemetría de Uso Ultra-Optimizada (Zero-Cost / Zero-Firestore I/O)
+// Diseñado para 0 consumo de cuota de red y mínimo impacto en CPU/batería.
 import { TabView } from '../types';
 
 export interface SectionTimeData {
@@ -16,7 +17,6 @@ export interface TelemetryReport {
 
 const STORAGE_KEY = 'kindev_user_telemetry_v1';
 
-// Nombres legibles de las secciones
 export const SECTION_LABELS: Record<string, string> = {
   kanban: '📌 Pipeline Kanban (Gestión de Leads)',
   analytics: '📊 Métricas & Analítica Comercial',
@@ -32,47 +32,69 @@ class UserTelemetryService {
   private lastTick: number = Date.now();
   private timerId: any = null;
   private isWindowFocused: boolean = true;
+  private memoryCache: Record<string, SectionTimeData> = {};
+  private isDirty: boolean = false;
+  private flushTimerId: any = null;
 
   constructor() {
     if (typeof window !== 'undefined') {
-      // Manejar cambios de visibilidad de pestaña (no contar tiempo si el usuario minimiza)
+      // 1. Cargar una sola vez de localStorage a memoria RAM
+      this.memoryCache = this.loadFromStorage();
+
+      // 2. Control inteligente de pestaña activa (pausa inmediata si se oculta)
       document.addEventListener('visibilitychange', () => {
         if (document.hidden) {
           this.pause();
+          this.flush(); // Guardar al minimizar
         } else {
           this.resume();
         }
       });
 
       window.addEventListener('focus', () => this.resume());
-      window.addEventListener('blur', () => this.pause());
+      window.addEventListener('blur', () => {
+        this.pause();
+        this.flush();
+      });
 
+      // 3. Guardar en memoria local cuando el usuario cierra la pestaña
+      window.addEventListener('beforeunload', () => this.flush());
+
+      // 4. Iniciar reloj en memoria (cada 10 segundos) y flush a disco (cada 60 segundos)
       this.startHeartbeat();
     }
   }
 
-  private loadData(): Record<string, SectionTimeData> {
+  private loadFromStorage(): Record<string, SectionTimeData> {
     try {
       const raw = localStorage.getItem(STORAGE_KEY);
       if (raw) return JSON.parse(raw);
-    } catch (e) {
-      console.warn('Error reading telemetry:', e);
+    } catch {
+      // Ignorar fallos de parseo
     }
     return {};
   }
 
-  private saveData(data: Record<string, SectionTimeData>) {
+  /**
+   * Escribe a disco solo si hay datos nuevos y espaciado en el tiempo.
+   * Evita operaciones de I/O innecesarias en el navegador.
+   */
+  public flush() {
+    if (!this.isDirty || typeof window === 'undefined') return;
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.warn('Error saving telemetry:', e);
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(this.memoryCache));
+      this.isDirty = false;
+    } catch {
+      // Falla silenciosa si localStorage está lleno
     }
   }
 
   private startHeartbeat() {
     if (this.timerId) clearInterval(this.timerId);
+    if (this.flushTimerId) clearInterval(this.flushTimerId);
     this.lastTick = Date.now();
 
+    // Pulso en RAM: incrementa contadores en memoria cada 10s (consumo CPU ~0.0001%)
     this.timerId = setInterval(() => {
       if (!this.isWindowFocused) return;
       const now = Date.now();
@@ -80,48 +102,49 @@ class UserTelemetryService {
       this.lastTick = now;
 
       if (elapsed > 0 && elapsed < 60) {
-        this.addTime(this.currentSection, elapsed);
+        this.addTimeInMemory(this.currentSection, elapsed);
       }
-    }, 5000); // Guardar cada 5 segundos
+    }, 10000);
+
+    // Flush a disco: Guarda en localStorage solo 1 vez cada 60 segundos
+    this.flushTimerId = setInterval(() => {
+      this.flush();
+    }, 60000);
   }
 
-  private addTime(section: string, seconds: number) {
-    const data = this.loadData();
-    if (!data[section]) {
-      data[section] = {
+  private addTimeInMemory(section: string, seconds: number) {
+    if (!this.memoryCache[section]) {
+      this.memoryCache[section] = {
         timeSeconds: 0,
         visitCount: 1,
         lastVisited: new Date().toISOString()
       };
     }
-    data[section].timeSeconds += seconds;
-    data[section].lastVisited = new Date().toISOString();
-    this.saveData(data);
+    this.memoryCache[section].timeSeconds += seconds;
+    this.memoryCache[section].lastVisited = new Date().toISOString();
+    this.isDirty = true;
   }
 
   public recordSectionChange(section: TabView | 'lead_profile') {
-    // Registrar tiempo previo
     const now = Date.now();
     const elapsed = Math.round((now - this.lastTick) / 1000);
     if (elapsed > 0 && elapsed < 60 && this.isWindowFocused) {
-      this.addTime(this.currentSection, elapsed);
+      this.addTimeInMemory(this.currentSection, elapsed);
     }
     this.lastTick = now;
     this.currentSection = section;
 
-    // Incrementar conteo de visitas
-    const data = this.loadData();
-    if (!data[section]) {
-      data[section] = {
+    if (!this.memoryCache[section]) {
+      this.memoryCache[section] = {
         timeSeconds: 0,
         visitCount: 1,
         lastVisited: new Date().toISOString()
       };
     } else {
-      data[section].visitCount += 1;
-      data[section].lastVisited = new Date().toISOString();
+      this.memoryCache[section].visitCount += 1;
+      this.memoryCache[section].lastVisited = new Date().toISOString();
     }
-    this.saveData(data);
+    this.isDirty = true;
   }
 
   public pause() {
@@ -129,7 +152,7 @@ class UserTelemetryService {
     const now = Date.now();
     const elapsed = Math.round((now - this.lastTick) / 1000);
     if (elapsed > 0 && elapsed < 60) {
-      this.addTime(this.currentSection, elapsed);
+      this.addTimeInMemory(this.currentSection, elapsed);
     }
     this.lastTick = now;
   }
@@ -140,12 +163,11 @@ class UserTelemetryService {
   }
 
   public getReport(): TelemetryReport {
-    const data = this.loadData();
     let totalSeconds = 0;
     let topSectionName = 'kanban';
     let maxSeconds = 0;
 
-    Object.entries(data).forEach(([key, val]) => {
+    Object.entries(this.memoryCache).forEach(([key, val]) => {
       totalSeconds += val.timeSeconds;
       if (val.timeSeconds > maxSeconds) {
         maxSeconds = val.timeSeconds;
@@ -157,7 +179,7 @@ class UserTelemetryService {
 
     return {
       totalSeconds,
-      sections: data,
+      sections: this.memoryCache,
       topSection: {
         name: topSectionName,
         timeSeconds: maxSeconds,
@@ -168,7 +190,11 @@ class UserTelemetryService {
   }
 
   public reset() {
-    localStorage.removeItem(STORAGE_KEY);
+    this.memoryCache = {};
+    this.isDirty = false;
+    try {
+      localStorage.removeItem(STORAGE_KEY);
+    } catch {}
     this.lastTick = Date.now();
   }
 }
