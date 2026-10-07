@@ -7,9 +7,12 @@ import {
   Award, 
   Layers, 
   Percent, 
-  Activity 
+  Activity,
+  Clock,
+  RotateCcw
 } from 'lucide-react';
 import { Lead } from '../types';
+import { userTelemetry, SECTION_LABELS } from '../lib/user-telemetry';
 
 interface AnalyticsViewProps {
   leads: Lead[];
@@ -28,6 +31,26 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
   const conversionRate = leads.length > 0 
     ? ((closedLeads.length / leads.length) * 100).toFixed(1) 
     : '0';
+
+  // Telemetría de uso del usuario
+  const [telemetry, setTelemetry] = React.useState(() => userTelemetry.getReport());
+
+  React.useEffect(() => {
+    const interval = setInterval(() => {
+      setTelemetry(userTelemetry.getReport());
+    }, 2500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const formatDuration = (totalSec: number) => {
+    if (totalSec < 60) return `${totalSec}s`;
+    const mins = Math.floor(totalSec / 60);
+    const secs = totalSec % 60;
+    if (mins < 60) return `${mins}m ${secs}s`;
+    const hours = Math.floor(mins / 60);
+    const remMins = mins % 60;
+    return `${hours}h ${remMins}m`;
+  };
 
   // 1. Desglose de servicios
   const serviceStats = leads.reduce((acc, lead) => {
@@ -256,6 +279,112 @@ export const AnalyticsView: React.FC<AnalyticsViewProps> = ({ leads }) => {
               );
             })}
           </div>
+        </div>
+
+        {/* Módulo de Telemetría: Registro de Tiempo y Hábitos de Uso */}
+        <div className="bg-white/85 backdrop-blur-sm p-4 sm:p-6 rounded-2xl border border-slate-200/70 shadow-xs space-y-4 md:col-span-2">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-slate-100">
+            <div className="flex items-center gap-3">
+              <div className="p-2.5 bg-violet-100/80 rounded-xl text-violet-700">
+                <Clock className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-extrabold text-slate-900 tracking-tight flex items-center gap-2">
+                  Telemetría de Uso Personal
+                  <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">
+                    En Vivo
+                  </span>
+                </h3>
+                <p className="text-xs text-slate-500">
+                  Mide en qué apartados pasas más tiempo trabajando para optimizar tu flujo diario.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 shrink-0">
+              <div className="text-right px-3 py-1.5 bg-slate-50 rounded-xl border border-slate-200/60">
+                <span className="text-[10px] text-slate-400 block font-medium">Tiempo Activo Total</span>
+                <span className="text-sm font-mono font-black text-violet-900">
+                  {formatDuration(telemetry.totalSeconds)}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  userTelemetry.reset();
+                  setTelemetry(userTelemetry.getReport());
+                }}
+                title="Reiniciar telemetría"
+                className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition-colors"
+              >
+                <RotateCcw className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {telemetry.totalSeconds === 0 ? (
+            <div className="py-6 text-center text-xs text-slate-400">
+              Iniciando medición... Navega entre pestañas y gestiona leads para registrar tu actividad.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              {Object.entries(telemetry.sections)
+                .sort(([, a], [, b]) => b.timeSeconds - a.timeSeconds)
+                .map(([secKey, secData]) => {
+                  const pct = telemetry.totalSeconds > 0 
+                    ? Math.round((secData.timeSeconds / telemetry.totalSeconds) * 100) 
+                    : 0;
+                  const label = SECTION_LABELS[secKey] || secKey;
+                  const isTop = telemetry.topSection.name === secKey;
+
+                  return (
+                    <div
+                      key={secKey}
+                      className={`p-3.5 rounded-xl border transition-all ${
+                        isTop 
+                          ? 'bg-violet-50/50 border-violet-200/80 shadow-xs' 
+                          : 'bg-slate-50/60 border-slate-100'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between text-xs mb-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
+                          <span className="font-extrabold text-slate-800 truncate">
+                            {label}
+                          </span>
+                          {isTop && (
+                            <span className="text-[9px] bg-violet-600 text-white font-black px-1.5 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+                              #1 Más Usado
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-right shrink-0">
+                          <span className="font-mono font-black text-slate-900">
+                            {formatDuration(secData.timeSeconds)}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-sans ml-1">
+                            ({pct}%)
+                          </span>
+                        </div>
+                      </div>
+
+                      <div className="w-full bg-slate-200/70 rounded-full h-1.5 overflow-hidden">
+                        <div
+                          className={`h-full rounded-full transition-all duration-500 ${
+                            isTop ? 'bg-violet-600' : 'bg-slate-400'
+                          }`}
+                          style={{ width: `${Math.max(pct, 4)}%` }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] text-slate-400 mt-1.5 font-medium">
+                        <span>{secData.visitCount} {secData.visitCount === 1 ? 'acceso' : 'accesos'}</span>
+                        <span>{pct}% del tiempo total</span>
+                      </div>
+                    </div>
+                  );
+                })}
+            </div>
+          )}
         </div>
 
       </div>

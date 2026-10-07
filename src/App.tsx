@@ -16,6 +16,7 @@ import {
 } from './types';
 import { dispatchMetaCAPI } from './lib/meta-capi';
 import { getFbc, getFbp, generateEventId, trackPixelEvent, getClientIp, getCachedClientIp, captureAndStoreFbclid } from './lib/meta-tracker';
+import { userTelemetry } from './lib/user-telemetry';
 import { SecurityGate } from './components/SecurityGate';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
@@ -258,6 +259,15 @@ export const App: React.FC = () => {
   const [isWsModalOpen, setIsWsModalOpen] = useState<boolean>(false);
   const [isMetaTokenModalOpen, setIsMetaTokenModalOpen] = useState<boolean>(false);
   const [apisStatus, setApisStatus] = useState<SystemApisStatus | null>(null);
+
+  // Telemetría: Registro del tiempo de permanencia y uso por sección
+  useEffect(() => {
+    if (profileLead) {
+      userTelemetry.recordSectionChange('lead_profile');
+    } else {
+      userTelemetry.recordSectionChange(activeTab);
+    }
+  }, [activeTab, profileLead]);
   const [wsStatus, setWsStatus] = useState<WhatsAppBotStatus>({
     status: 'disconnected',
     isListening: false,
