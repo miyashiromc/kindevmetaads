@@ -1,5 +1,11 @@
 import { initializeApp, getApps, type FirebaseApp } from 'firebase/app';
-import { getFirestore, type Firestore } from 'firebase/firestore';
+import { 
+  initializeFirestore, 
+  getFirestore, 
+  persistentLocalCache, 
+  persistentMultipleTabManager, 
+  type Firestore 
+} from 'firebase/firestore';
 
 const firebaseConfig = {
   projectId: 'kindevmetaads',
@@ -17,7 +23,20 @@ if (!getApps().length) {
   app = getApps()[0];
 }
 
-export const db: Firestore = getFirestore(app);
+// Configuración de Firestore con persistencia IndexedDB multiventana
+// Evita volver a leer toda la colección de 134 leads en cada F5 o visita móvil, protegiendo la cuota gratuita (Spark)
+let firestoreDb: Firestore;
+try {
+  firestoreDb = initializeFirestore(app, {
+    localCache: persistentLocalCache({
+      tabManager: persistentMultipleTabManager()
+    })
+  });
+} catch {
+  firestoreDb = getFirestore(app);
+}
+
+export const db: Firestore = firestoreDb;
 
 /**
  * Elimina propiedades undefined para evitar errores fatales en Firestore SDK (Unsupported field value: undefined)

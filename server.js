@@ -425,9 +425,9 @@ async function syncFirestoreExistingLeadsCache() {
   }
 }
 
-// Sincronizar al arrancar y cada 10 minutos
+// Sincronizar al arrancar y cada 6 horas (optimizado para no consumir la cuota gratuita de Firestore)
 syncFirestoreExistingLeadsCache();
-setInterval(syncFirestoreExistingLeadsCache, 10 * 60 * 1000);
+setInterval(syncFirestoreExistingLeadsCache, 6 * 60 * 60 * 1000);
 
 // Helper unificado para guardar leads en Cloud Firestore con PROTECCIÓN TOTAL DE DUPLICADOS
 async function saveLeadToFirestore({ name, phone, displayPhone, service, notes, source, tenantId = 'kindev', eventId }) {
@@ -1306,9 +1306,11 @@ function getMetaTokens() {
       const userTokenMatch = raw.match(/META_USER_TOKEN=(.*)/);
       const capiTokenMatch = raw.match(/META_ACCESS_TOKEN=(.*)/);
       const datasetMatch = raw.match(/META_DATASET_ID=(.*)/);
+      const plainToken = raw.trim().startsWith('EAA') ? raw.trim().split(/[\r\n]+/)[0].trim() : '';
+
       return {
-        userToken: userTokenMatch ? userTokenMatch[1].trim() : '',
-        capiToken: capiTokenMatch ? capiTokenMatch[1].trim() : '',
+        userToken: userTokenMatch ? userTokenMatch[1].trim() : (plainToken || ''),
+        capiToken: capiTokenMatch ? capiTokenMatch[1].trim() : (plainToken || ''),
         datasetId: datasetMatch ? datasetMatch[1].trim() : '1368429478371391',
         adAccountId: '4362799907368161'
       };

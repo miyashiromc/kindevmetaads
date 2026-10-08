@@ -3,21 +3,15 @@ import {
   Sparkles, 
   Sliders, 
   AlertTriangle, 
-  CheckCircle2, 
   RefreshCw, 
-  ShieldAlert, 
   MessageSquare, 
   DollarSign, 
   MousePointerClick, 
-  Copy, 
   Flame, 
   Target,
   Clock,
   MapPin,
   Activity,
-  Mic,
-  ShieldCheck,
-  Radio,
   TrendingUp,
   Zap,
   Eye,
@@ -54,25 +48,25 @@ const DEFAULT_LIVE_TELEMETRY: MetaLiveTelemetry = {
   campaign: {
     id: '120246770184380741',
     name: 'capi Clientes Web WhatsApp - Kindev 2026',
-    spend: 61.09,
-    impressions: 11478,
-    reach: 6310,
-    frequency: 1.82,
-    clicks: 196,
-    cpc: 0.31,
-    cpm: 5.32,
-    messagingConnections: 45,
-    firstReplies: 43,
-    depth2Replies: 23,
-    depth5Replies: 68,
-    linkClicks: 112,
+    spend: 155.04,
+    impressions: 32247,
+    reach: 17780,
+    frequency: 1.81,
+    clicks: 544,
+    cpc: 0.285,
+    cpm: 4.81,
+    messagingConnections: 114,
+    firstReplies: 104,
+    depth2Replies: 66,
+    depth5Replies: 328,
+    linkClicks: 295,
     costPerMessage: 1.36,
-    dropRatePercent: 48.9
+    dropRatePercent: 42.1
   },
   platforms: [
-    { platform: 'facebook', spend: 37.34, impressions: 6736, clicks: 132, messages: 28, costPerMessage: 1.33, conversionRatePercent: 0.42 },
-    { platform: 'instagram', spend: 15.66, impressions: 2055, clicks: 46, messages: 10, costPerMessage: 1.57, conversionRatePercent: 0.49 },
-    { platform: 'whatsapp', spend: 8.04, impressions: 2682, clicks: 18, messages: 7, costPerMessage: 1.15, conversionRatePercent: 0.26 }
+    { platform: 'facebook', spend: 100.69, impressions: 20641, clicks: 405, messages: 78, costPerMessage: 1.29, conversionRatePercent: 0.38 },
+    { platform: 'instagram', spend: 35.14, impressions: 5191, clicks: 96, messages: 20, costPerMessage: 1.76, conversionRatePercent: 0.39 },
+    { platform: 'whatsapp', spend: 19.15, impressions: 6406, clicks: 43, messages: 16, costPerMessage: 1.20, conversionRatePercent: 0.25 }
   ],
   activeAd: {
     id: '120246770184360741',
@@ -83,38 +77,71 @@ const DEFAULT_LIVE_TELEMETRY: MetaLiveTelemetry = {
     bodySnippet: '¿Aún no tienes tu página web? ¡Estás perdiendo clientes todos los días! En Kindev S.A.S. creamos tu sitio web profesional por solo $120 USD (inversión única, sin mensualidades sorpresa)...'
   },
   killSwitch: {
-    enabled: true,
+    enabled: false,
     maxCostPerMessage: 2.20,
     maxSpendWithoutLead: 4.00,
-    currentCost: 1.40,
-    statusText: 'Óptimo — Bajo umbral de seguridad'
+    currentCost: 1.36,
+    statusText: 'Desactivado — Ejecución continua sin pausas automáticas'
   }
 };
 
-type SubTab = 'resumen' | 'mapa_ciudades' | 'scripts_cierre' | 'reglas_live';
+type SubTab = 'resumen' | 'mapa_ciudades';
 
 export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads }) => {
   const closedLeads = leads.filter((l) => l.status === 'cerrado');
   const totalRevenue = closedLeads.reduce((acc, curr) => acc + (curr.amount || 0), 0);
 
-  const [telemetry, setTelemetry] = useState<MetaLiveTelemetry>(DEFAULT_LIVE_TELEMETRY);
+  const [telemetry, setTelemetry] = useState<MetaLiveTelemetry>(() => {
+    try {
+      const saved = localStorage.getItem('kindev_meta_telemetry_cache');
+      if (saved) return JSON.parse(saved);
+    } catch {
+      // ignore
+    }
+    return DEFAULT_LIVE_TELEMETRY;
+  });
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [activeSubTab, setActiveSubTab] = useState<SubTab>('resumen');
   const [viewMode, setViewMode] = useState<'live' | 'simulator'>('live');
-  const [totalAdSpend, setTotalAdSpend] = useState<number>(21.05);
-  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [totalAdSpend, setTotalAdSpend] = useState<number>(() => telemetry.campaign.spend || 155.04);
 
   const fetchLiveInsights = async (forceRefresh = false) => {
     setIsLoading(true);
     try {
-      const res = await fetch(`/api/meta/insights${forceRefresh ? '?refresh=true' : ''}`);
-      if (res.ok) {
-        const data: MetaLiveTelemetry = await res.json();
+      let data: MetaLiveTelemetry | null = null;
+      // 1. Intentar endpoint relativo (funciona en proxy o server local)
+      try {
+        const res = await fetch(`/api/meta/insights${forceRefresh ? '?refresh=true' : ''}`, {
+          signal: AbortSignal.timeout(3000)
+        });
+        if (res.ok) data = await res.json();
+      } catch {
+        // Fallback a localhost directo si se prueba en red
+      }
+
+      // 2. Si no respondió el relativo, probar http://localhost:3000 directo
+      if (!data && typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1')) {
+        try {
+          const res = await fetch(`http://localhost:3000/api/meta/insights${forceRefresh ? '?refresh=true' : ''}`, {
+            signal: AbortSignal.timeout(3000)
+          });
+          if (res.ok) data = await res.json();
+        } catch {
+          // ignore
+        }
+      }
+
+      if (data && data.campaign && Array.isArray(data.platforms)) {
         setTelemetry(data);
         setTotalAdSpend(data.campaign.spend);
+        try {
+          localStorage.setItem('kindev_meta_telemetry_cache', JSON.stringify(data));
+        } catch {
+          // ignore
+        }
       }
     } catch {
-      // Fallback seguro en snapshot
+      // Mantiene el último estado válido
     } finally {
       setIsLoading(false);
     }
@@ -128,14 +155,6 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
   const overallRoas = currentSpend > 0 ? (totalRevenue / currentSpend).toFixed(1) : '0';
   const totalProfit = totalRevenue - currentSpend;
 
-  const copyToClipboard = (text: string, id: string) => {
-    if (navigator?.clipboard) {
-      navigator.clipboard.writeText(text);
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 2500);
-    }
-  };
-
   // Frecuencia calculada en vivo de Meta Graph API
   const adFrequency = telemetry.campaign.frequency 
     || (telemetry.campaign.reach && telemetry.campaign.reach > 0 
@@ -143,44 +162,6 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
         : 1.18);
   // Posición del indicador en el tacómetro (normalizado a % de la barra)
   const tachometerPosition = Math.min(Math.max(((adFrequency - 1.0) / (2.5 - 1.0)) * 100, 0), 100);
-
-  // Guión de Nota de Voz
-  const audioVoiceScript = `¡Hola! Qué gusto saludarte. Vi que te interesa tu página web profesional por $120 USD. Cuéntame brevemente: ¿cuál es el nombre y giro de tu negocio o empresa? Así te muestro un ejemplo similar de nuestro portafolio de Kindev de inmediato para que veas la calidad antes de decidir.`;
-
-  // Scripts de Objeciones
-  const objectionScripts = [
-    {
-      id: 'obj_precio',
-      emoji: '💰',
-      title: '\"¿Tiene algún descuento o cuánto es lo último?\"',
-      text: `El precio de $120 USD ya incluye una tarifa de promoción de lanzamiento para PYMEs. Es un pago 100% único, sin mensualidades ni cobros ocultos por mantenimiento básico. Incluye tus 5 secciones, botón de WhatsApp directo y diseño adaptado a celulares. Para agendarte hoy solo iniciamos con un anticipo del 50% ($60 USD) y el saldo contra entrega aprobada.`
-    },
-    {
-      id: 'obj_incluye',
-      emoji: '📦',
-      title: '\"¿Qué incluye exactamente el sitio web?\"',
-      text: `Tu proyecto por $120 USD incluye:\n1. Hasta 5 secciones (Inicio, Nosotros, Servicios/Catálogo, Testimonios y Contacto).\n2. Botón flotante a tu WhatsApp para cerrar ventas directas.\n3. Formulario de contacto y mapa interactivo.\n4. Carga ultra rápida optimizada para celulares.\n5. Vinculación con tus redes sociales.\n¿Tienes listo el logotipo de tu negocio o te ayudamos a prepararlo?`
-    },
-    {
-      id: 'obj_pensarlo',
-      emoji: '🤔',
-      title: '\"Déjame pensarlo / Te aviso después\"',
-      text: `¡Claro que sí! Con gusto. Solo te dejo este dato: mientras lo piensas, tus clientes potenciales te están buscando en Google y redes sociales. Te dejo este enlace de demostración de nuestro portafolio para que veas cómo luciría tu marca: https://kindev.tech. Si arrancamos esta semana, te la entregamos lista y funcionando en 3 a 5 días hábiles.`
-    }
-  ];
-
-  // Helper para tiempo relativo
-  const formatRelativeTime = (dateStr?: string): string => {
-    if (!dateStr) return 'Reciente';
-    const d = new Date(dateStr);
-    if (isNaN(d.getTime())) return 'Reciente';
-    const diffSec = Math.floor((Date.now() - d.getTime()) / 1000);
-    if (diffSec < 60) return 'Hace un momento';
-    if (diffSec < 3600) return `Hace ${Math.floor(diffSec / 60)} min`;
-    if (diffSec < 86400) return `Hace ${Math.floor(diffSec / 3600)} h`;
-    const days = Math.floor(diffSec / 86400);
-    return `Hace ${days} d`;
-  };
 
   // ─── Control y Sincronización de Semanas con Ritmo Semanal ───
   const [weekOffset, setWeekOffset] = useState<number | 'all'>(() => {
@@ -377,116 +358,76 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
     };
   }, [leadsForHeatmap, weekOffset]);
 
-  // ─── 2. FEED DE ACTIVIDAD 100% REAL DE METAEVENTS Y CRM ───
-  const liveEvents = useMemo(() => {
-    const list: {
-      id: string;
-      time: string;
-      badge: string;
-      badgeColor: string;
-      dotColor: string;
-      title: string;
-      detail: string;
-      rawDate: number;
-    }[] = [];
-
-    leads.forEach((l) => {
-      // 1. Eventos CAPI despachados
-      if (l.metaEvents && l.metaEvents.length > 0) {
-        l.metaEvents.forEach((evt, idx) => {
-          const evtDate = new Date(evt.date);
-          const isPurchase = evt.eventName === 'Purchase';
-
-          list.push({
-            id: `meta_${l.id}_${idx}`,
-            time: formatRelativeTime(evt.date),
-            badge: isPurchase ? 'CAPI Purchase' : 'CAPI Lead',
-            badgeColor: isPurchase 
-              ? 'bg-amber-500/10 text-amber-700 ring-1 ring-amber-500/20' 
-              : 'bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20',
-            dotColor: isPurchase ? 'bg-amber-500' : 'bg-emerald-500',
-            title: isPurchase 
-              ? `Venta de $${Number(evt.amount || l.amount || 0).toFixed(2)} USD reportada a Meta CAPI` 
-              : `Evento "${evt.eventName}" confirmado en Meta Dataset`,
-            detail: `Cliente: ${l.name} • Trace ID: ${evt.fbtraceId || 'Confirmado'}${evt.testMode ? ' • [Modo Prueba]' : ''}`,
-            rawDate: isNaN(evtDate.getTime()) ? Date.now() : evtDate.getTime()
-          });
-        });
-      }
-
-      // 2. Registros de leads reales
-      if (l.createdAt) {
-        const createDate = new Date(l.createdAt);
-        list.push({
-          id: `lead_${l.id}`,
-          time: formatRelativeTime(l.createdAt),
-          badge: l.source === 'whatsapp_auto' 
-            ? '⚡ Auto-WhatsApp' 
-            : l.source === 'whatsapp_outreach' 
-              ? '🎯 Prospección' 
-              : 'CRM Manual',
-          badgeColor: l.source === 'whatsapp_auto' 
-            ? 'bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20' 
-            : l.source === 'whatsapp_outreach'
-              ? 'bg-indigo-500/10 text-indigo-700 ring-1 ring-indigo-500/20'
-              : 'bg-blue-500/10 text-blue-700 ring-1 ring-blue-500/20',
-          dotColor: l.source === 'whatsapp_auto' ? 'bg-emerald-500' : l.source === 'whatsapp_outreach' ? 'bg-indigo-500' : 'bg-blue-500',
-          title: `Contacto: ${l.name}`,
-          detail: `Teléfono: +${l.phone} • Servicio: ${l.service} • Etapa: ${l.status.toUpperCase()}`,
-          rawDate: isNaN(createDate.getTime()) ? 0 : createDate.getTime()
-        });
-      }
-    });
-
-    list.sort((a, b) => b.rawDate - a.rawDate);
-    return list.slice(0, 8);
-  }, [leads]);
-
-  // ─── 3. ANÁLISIS GEOGRÁFICO Y CANALES 100% REAL ───
+  // ─── 2. ANÁLISIS GEOGRÁFICO Y CANALES 100% REAL (Sin Datos Inventados) ───
   const geoStats = useMemo(() => {
     let quitoCount = 0;
     let gyeCount = 0;
+    let otherCount = 0; // leads sin ciudad determinable
     let autoWhatsAppCount = 0;
     let outreachCount = 0;
     let manualCount = 0;
 
+    // Servicios más solicitados por canal
+    const autoServices: Record<string, number> = {};
+    const manualServices: Record<string, number> = {};
+
     leads.forEach((l) => {
-      if (l.source === 'whatsapp_auto') autoWhatsAppCount++;
-      else if (l.source === 'whatsapp_outreach') outreachCount++;
-      else manualCount++;
+      // Clasificar por canal de captura
+      if (l.source === 'whatsapp_auto') {
+        autoWhatsAppCount++;
+        const svc = (l.service || 'Sin especificar').trim();
+        autoServices[svc] = (autoServices[svc] || 0) + 1;
+      } else if (l.source === 'whatsapp_outreach') {
+        outreachCount++;
+      } else {
+        manualCount++;
+        const svc = (l.service || 'Sin especificar').trim();
+        manualServices[svc] = (manualServices[svc] || 0) + 1;
+      }
 
+      // Clasificar por Geo: buscar en notes, service, name (SOLO datos reales, sin fallback)
       const text = `${l.notes || ''} ${l.service || ''} ${l.name || ''}`.toLowerCase();
+      const quitoKeywords = ['quito', 'pichincha', 'cumbayá', 'valle de los chillos', 'tumbaco', 'sangolquí'];
+      const gyeKeywords = ['guayaquil', 'guayas', 'samborondón', 'durán', 'daule', 'milagro', 'salinas', 'manta', 'machala', 'cuenca', 'ambato', 'riobamba', 'loja', 'ibarra', 'esmeraldas', 'portoviejo', 'santo domingo'];
 
-      if (text.includes('quito') || text.includes('pichincha') || text.includes('cumbayá') || text.includes('valle')) {
+      if (quitoKeywords.some(kw => text.includes(kw))) {
         quitoCount++;
-      } else if (text.includes('guayaquil') || text.includes('guayas') || text.includes('samborondón') || text.includes('durán')) {
+      } else if (gyeKeywords.some(kw => text.includes(kw))) {
         gyeCount++;
+      } else {
+        otherCount++; // Sin datos suficientes para clasificar
       }
     });
 
     const total = leads.length || 1;
-    const effectiveQuito = quitoCount > 0 ? quitoCount : Math.round(leads.length * 0.58);
-    const effectiveGye = gyeCount > 0 ? gyeCount : Math.max(0, leads.length - effectiveQuito);
+
+    // Servicio más demandado por canal
+    const topAutoService = Object.entries(autoServices).sort((a, b) => b[1] - a[1])[0];
+    const topManualService = Object.entries(manualServices).sort((a, b) => b[1] - a[1])[0];
 
     return {
-      quitoCount: effectiveQuito,
-      quitoPct: Math.round((effectiveQuito / total) * 100),
-      gyeCount: effectiveGye,
-      gyePct: Math.round((effectiveGye / total) * 100),
+      quitoCount,
+      quitoPct: Math.round((quitoCount / total) * 100),
+      gyeCount,
+      gyePct: Math.round((gyeCount / total) * 100),
+      otherCount,
+      otherPct: Math.round((otherCount / total) * 100),
       autoWhatsAppCount,
       autoWhatsAppPct: Math.round((autoWhatsAppCount / total) * 100),
+      outreachCount,
+      outreachPct: Math.round((outreachCount / total) * 100),
       manualCount,
       manualPct: Math.round((manualCount / total) * 100),
-      totalLeads: leads.length
+      totalLeads: leads.length,
+      topAutoService: topAutoService ? topAutoService[0] : 'N/A',
+      topManualService: topManualService ? topManualService[0] : 'N/A',
     };
   }, [leads]);
 
   // Subtab config para DRY
   const subTabs: { id: SubTab; label: string; icon: React.ReactNode; color: string }[] = [
     { id: 'resumen', label: 'Vista Ejecutiva', icon: <Sparkles className="w-3.5 h-3.5" />, color: 'text-indigo-500' },
-    { id: 'mapa_ciudades', label: 'Horas Doradas & Mapa', icon: <Clock className="w-3.5 h-3.5" />, color: 'text-amber-500' },
-    { id: 'scripts_cierre', label: 'Guiones de Cierre', icon: <Mic className="w-3.5 h-3.5" />, color: 'text-rose-500' },
-    { id: 'reglas_live', label: 'Kill Switch & Feed Real', icon: <ShieldAlert className="w-3.5 h-3.5" />, color: 'text-emerald-500' },
+    { id: 'mapa_ciudades', label: 'Horas Doradas & Canales', icon: <Clock className="w-3.5 h-3.5" />, color: 'text-amber-500' },
   ];
 
   // ─── 4. EMBUDO REAL DE CONVERSIÓN BASADO EN TUS LEADS (4 Fases Oficiales) ───
@@ -1171,7 +1112,7 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
             </div>
           </div>
 
-          {/* ─── Geo: Quito vs Guayaquil ─── */}
+          {/* ─── Canales de Captura & Geo Real ─── */}
           <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
             <div className="flex items-center gap-3 border-b border-slate-100/80 pb-3">
               <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-500 text-white shadow-sm shadow-indigo-500/20">
@@ -1179,320 +1120,132 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
               </div>
               <div>
                 <h3 className="text-sm sm:text-base font-black text-slate-900">
-                  Rendimiento Geográfico Real
+                  Canales de Captura
                 </h3>
-                <p className="text-[11px] text-slate-500">Distribución calculada a partir de los números de contacto y orígenes de leads</p>
+                <p className="text-[11px] text-slate-500">Distribución real por fuente de origen de {geoStats.totalLeads} leads</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Quito */}
-              <div className="group p-4 rounded-2xl ring-1 ring-indigo-200/60 bg-gradient-to-b from-indigo-500/5 to-transparent hover:shadow-md transition-all duration-300 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 ring-2 ring-indigo-600/20" />
-                    <span className="text-sm font-black text-slate-900">Quito & Pichincha</span>
-                    <span className="text-[10px] text-slate-400 font-medium">(Nacional)</span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-700 text-[10px] font-bold ring-1 ring-indigo-500/20">
-                    {geoStats.quitoPct}% Total
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-bold text-slate-700">
-                    <span>Prospectos Registrados</span>
-                    <span className="font-mono text-indigo-700">{geoStats.quitoCount} chats ({geoStats.quitoPct}%)</span>
-                  </div>
-                  <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full animate-bar-fill" style={{ '--bar-width': `${geoStats.quitoPct}%`, width: `${geoStats.quitoPct}%` } as React.CSSProperties} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-slate-100/50">
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Canal Principal</span>
-                    <span className="font-mono font-bold text-slate-800">WhatsApp / Web</span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Demanda</span>
-                    <span className="font-semibold text-slate-700">Web Corporativa</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Guayaquil */}
-              <div className="group p-4 rounded-2xl ring-1 ring-sky-200/60 bg-gradient-to-b from-sky-500/5 to-transparent hover:shadow-md transition-all duration-300 space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2.5">
-                    <span className="w-2.5 h-2.5 rounded-full bg-sky-600 ring-2 ring-sky-600/20" />
-                    <span className="text-sm font-black text-slate-900">Guayaquil & Costa</span>
-                    <span className="text-[10px] text-slate-400 font-medium">(Nacional)</span>
-                  </div>
-                  <span className="px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-700 text-[10px] font-bold ring-1 ring-sky-500/20">
-                    {geoStats.gyePct}% Total
-                  </span>
-                </div>
-
-                <div className="space-y-1.5">
-                  <div className="flex justify-between text-xs font-bold text-slate-700">
-                    <span>Prospectos Registrados</span>
-                    <span className="font-mono text-sky-700">{geoStats.gyeCount} chats ({geoStats.gyePct}%)</span>
-                  </div>
-                  <div className="w-full h-2.5 rounded-full bg-slate-100 overflow-hidden">
-                    <div className="h-full bg-gradient-to-r from-sky-500 to-sky-600 rounded-full animate-bar-fill" style={{ '--bar-width': `${geoStats.gyePct}%`, width: `${geoStats.gyePct}%` } as React.CSSProperties} />
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-xs pt-2 border-t border-slate-100/50">
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Captura Auto</span>
-                    <span className="font-mono font-bold text-slate-800">{geoStats.autoWhatsAppCount} leads</span>
-                  </div>
-                  <div>
-                    <span className="text-[9px] text-slate-400 font-bold uppercase block">Captura Manual</span>
-                    <span className="font-semibold text-slate-700">{geoStats.manualCount} leads</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* VISTA 3: GUIONES DE CIERRE & NOTA DE VOZ                          */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {activeSubTab === 'scripts_cierre' && (
-        <div className="space-y-4 sm:space-y-5 stagger-children">
-          
-          {/* ─── Nota de Voz 20s ─── */}
-          <div className="bg-gradient-to-br from-rose-50/60 via-pink-50/30 to-white glass-card rounded-2xl sm:rounded-3xl ring-1 ring-rose-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-rose-100/60 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2.5 rounded-2xl bg-gradient-to-br from-rose-500 to-pink-600 text-white shadow-md shadow-rose-500/20">
-                  <Mic className="w-5 h-5" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-black text-slate-900">
-                    Nota de Voz de 20 Segundos
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    +300% respuestas con confianza humana inmediata
-                  </p>
-                </div>
-              </div>
-
-              <button
-                type="button"
-                onClick={() => copyToClipboard(audioVoiceScript, 'voice')}
-                className={`px-4 py-2 rounded-xl font-bold text-xs transition-all flex items-center gap-2 shrink-0 active:scale-95 ${
-                  copiedId === 'voice'
-                    ? 'bg-emerald-600 text-white shadow-md shadow-emerald-500/20'
-                    : 'bg-gradient-to-r from-rose-500 to-pink-600 hover:from-rose-600 hover:to-pink-700 text-white shadow-md shadow-rose-500/20'
-                }`}
-              >
-                {copiedId === 'voice' ? (
-                  <>
-                    <CheckCircle2 className="w-3.5 h-3.5" />
-                    <span>¡Copiado!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="w-3.5 h-3.5" />
-                    <span>Copiar Guión</span>
-                  </>
-                )}
-              </button>
-            </div>
-
-            <div className="bg-white/80 p-4 rounded-xl ring-1 ring-rose-200/40 text-xs text-slate-700 leading-relaxed font-mono select-all">
-              "{audioVoiceScript}"
-            </div>
-
-            <div className="flex items-center gap-2 text-[11px] text-slate-500 bg-amber-500/5 p-2.5 rounded-xl ring-1 ring-amber-500/10">
-              <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span><strong>Tip:</strong> Grábalo caminando o de pie, con tono enérgico y seguro. No lo leas como un robot.</span>
-            </div>
-          </div>
-
-          {/* ─── Banco de Objeciones ─── */}
-          <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight flex items-center gap-2">
-                  <span>Cazador de Objeciones</span>
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-0.5">
-                  Copia y responde en 5 segundos cuando el cliente dude
-                </p>
-              </div>
-              <span className="px-2.5 py-1 rounded-xl bg-slate-100/80 text-slate-600 text-[10px] font-bold ring-1 ring-slate-200/50">
-                3 Respuestas
-              </span>
-            </div>
-
-            <div className="space-y-3">
-              {objectionScripts.map((obj) => (
-                <div key={obj.id} className="group p-4 rounded-2xl ring-1 ring-slate-200/50 bg-slate-50/30 hover:bg-white hover:shadow-sm transition-all duration-200 space-y-3">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-start gap-2.5">
-                      <span className="text-lg leading-none mt-0.5">{obj.emoji}</span>
-                      <span className="text-xs font-black text-slate-900 leading-snug">
-                        {obj.title}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => copyToClipboard(obj.text, obj.id)}
-                      className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all flex items-center gap-1.5 shrink-0 active:scale-95 ${
-                        copiedId === obj.id
-                          ? 'bg-emerald-600 text-white shadow-sm'
-                          : 'bg-white ring-1 ring-slate-200/60 hover:ring-slate-300 text-slate-600 hover:text-slate-900 shadow-sm'
-                      }`}
-                    >
-                      {copiedId === obj.id ? (
-                        <>
-                          <CheckCircle2 className="w-3 h-3" />
-                          <span>Copiado</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="w-3 h-3" />
-                          <span>Copiar</span>
-                        </>
-                      )}
-                    </button>
-                  </div>
-
-                  <div className="bg-white/80 p-3 rounded-xl ring-1 ring-slate-100 text-xs font-mono text-slate-600 whitespace-pre-line leading-relaxed">
-                    {obj.text}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
-        </div>
-      )}
-
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {/* VISTA 4: REGLAS AUTOMATIZADAS & FEED EN VIVO                      */}
-      {/* ═══════════════════════════════════════════════════════════════════ */}
-      {activeSubTab === 'reglas_live' && (
-        <div className="space-y-4 sm:space-y-5 stagger-children">
-          
-          {/* ─── Monitor de Reglas ─── */}
-          <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100/80 pb-4">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 text-white shadow-sm shadow-emerald-500/20">
-                  <ShieldCheck className="w-4 h-4" />
-                </div>
-                <div>
-                  <h3 className="text-sm sm:text-base font-black text-slate-900">
-                    Ad Rules Engine
-                  </h3>
-                  <p className="text-[11px] text-slate-500 mt-0.5">
-                    Reglas activas en <code className="text-[10px] font-mono">act_4362799907368161</code>
-                  </p>
-                </div>
-              </div>
-
-              <span className="px-3 py-1.5 rounded-xl bg-emerald-500/10 text-emerald-700 ring-1 ring-emerald-500/20 text-xs font-black flex items-center gap-1.5">
-                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                2 Reglas Activas
-              </span>
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              {/* Kill Switch */}
+            {/* Tres canales reales */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Canal 1: Auto WhatsApp (CTWA Ads) */}
               <div className="group p-4 rounded-2xl ring-1 ring-emerald-200/60 bg-gradient-to-b from-emerald-500/5 to-transparent hover:shadow-md transition-all duration-300 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                    <ShieldAlert className="w-3.5 h-3.5 text-emerald-600" />
-                    Kill Switch
-                  </span>
-                  <span className="text-[9px] font-mono font-bold text-emerald-700 bg-emerald-500/10 px-2 py-0.5 rounded-md">
-                    ID: 1395763...
-                  </span>
-                </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  <strong>PAUSE Campaña</strong> si costo/msg &gt; <strong>$2.50 USD</strong> tras 3 resultados
-                </p>
-                <div className="text-[10px] font-bold text-emerald-700 flex items-center gap-1.5 bg-emerald-500/5 p-2 rounded-lg ring-1 ring-emerald-500/10">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>ENABLED — Evaluando continuamente</span>
-                </div>
-              </div>
-
-              {/* Alerta */}
-              <div className="group p-4 rounded-2xl ring-1 ring-sky-200/60 bg-gradient-to-b from-sky-500/5 to-transparent hover:shadow-md transition-all duration-300 space-y-3">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-black text-slate-900 flex items-center gap-1.5">
-                    <AlertTriangle className="w-3.5 h-3.5 text-sky-600" />
-                    Alerta Preventiva
-                  </span>
-                  <span className="text-[9px] font-mono font-bold text-sky-700 bg-sky-500/10 px-2 py-0.5 rounded-md">
-                    ID: 1480910...
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-emerald-600 ring-2 ring-emerald-600/20" />
+                    <span className="text-xs font-black text-slate-900">⚡ Auto CTWA</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-700 text-[10px] font-bold ring-1 ring-emerald-500/20">
+                    {geoStats.autoWhatsAppPct}%
                   </span>
                 </div>
-                <p className="text-xs text-slate-600 leading-relaxed">
-                  <strong>NOTIFICATION</strong> si costo/resultado &gt; <strong>$2.20 USD</strong> tras 2 resultados
-                </p>
-                <div className="text-[10px] font-bold text-sky-700 flex items-center gap-1.5 bg-sky-500/5 p-2 rounded-lg ring-1 ring-sky-500/10">
-                  <CheckCircle2 className="w-3.5 h-3.5" />
-                  <span>ENABLED — Evaluando continuamente</span>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* ─── Feed de Actividad con Timeline ─── */}
-          <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
-            <div className="flex items-center justify-between border-b border-slate-100/80 pb-3">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-xl bg-gradient-to-br from-indigo-500 to-violet-600 text-white shadow-sm shadow-indigo-500/20">
-                  <Radio className="w-4 h-4" />
-                </div>
-                <h3 className="text-sm sm:text-base font-black text-slate-900">
-                  Feed en Tiempo Real
-                </h3>
-              </div>
-              <span className="text-[10px] text-slate-400 font-mono font-medium">Últimas 24h</span>
-            </div>
-
-            {/* Timeline con línea conectora */}
-            <div className="relative pl-8 timeline-line space-y-1">
-              {liveEvents.map((ev) => (
-                <div key={ev.id} className="group relative p-3 rounded-xl hover:bg-slate-50/60 transition-all duration-200 animate-slide-up">
-                  {/* Dot en la timeline */}
-                  <div className={`absolute left-[-22px] top-4 w-3 h-3 rounded-full ${ev.dotColor} ring-4 ring-white z-10 group-hover:scale-125 transition-transform`} />
-                  
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="space-y-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${ev.badgeColor}`}>
-                          {ev.badge}
-                        </span>
-                        <span className="font-bold text-xs text-slate-900 truncate">
-                          {ev.title}
-                        </span>
-                      </div>
-                      <p className="text-[10px] text-slate-500 font-mono leading-relaxed truncate">
-                        {ev.detail}
-                      </p>
-                    </div>
-
-                    <span className="text-[10px] font-mono text-slate-400 shrink-0 font-medium whitespace-nowrap mt-0.5">
-                      {ev.time}
-                    </span>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-bold text-slate-700">
+                    <span>Leads Auto</span>
+                    <span className="font-mono text-emerald-700">{geoStats.autoWhatsAppCount}</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-600 rounded-full animate-bar-fill" style={{ '--bar-width': `${geoStats.autoWhatsAppPct}%`, width: `${geoStats.autoWhatsAppPct}%` } as React.CSSProperties} />
                   </div>
                 </div>
-              ))}
-            </div>
-          </div>
+                <div className="text-[10px] pt-1.5 border-t border-slate-100/50">
+                  <span className="text-slate-400 font-bold uppercase">Top servicio: </span>
+                  <span className="font-semibold text-slate-700">{geoStats.topAutoService}</span>
+                </div>
+              </div>
 
+              {/* Canal 2: Prospección Outreach */}
+              <div className="group p-4 rounded-2xl ring-1 ring-indigo-200/60 bg-gradient-to-b from-indigo-500/5 to-transparent hover:shadow-md transition-all duration-300 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-indigo-600 ring-2 ring-indigo-600/20" />
+                    <span className="text-xs font-black text-slate-900">🎯 Prospección</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-indigo-500/10 text-indigo-700 text-[10px] font-bold ring-1 ring-indigo-500/20">
+                    {geoStats.outreachPct}%
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-bold text-slate-700">
+                    <span>Leads Outreach</span>
+                    <span className="font-mono text-indigo-700">{geoStats.outreachCount}</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-indigo-500 to-indigo-600 rounded-full animate-bar-fill" style={{ '--bar-width': `${geoStats.outreachPct}%`, width: `${geoStats.outreachPct}%` } as React.CSSProperties} />
+                  </div>
+                </div>
+                <div className="text-[10px] pt-1.5 border-t border-slate-100/50">
+                  <span className="text-slate-400 font-bold uppercase">Fuente: </span>
+                  <span className="font-semibold text-slate-700">Script masivo WA</span>
+                </div>
+              </div>
+
+              {/* Canal 3: Manual CRM */}
+              <div className="group p-4 rounded-2xl ring-1 ring-sky-200/60 bg-gradient-to-b from-sky-500/5 to-transparent hover:shadow-md transition-all duration-300 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="w-2.5 h-2.5 rounded-full bg-sky-600 ring-2 ring-sky-600/20" />
+                    <span className="text-xs font-black text-slate-900">📋 Manual</span>
+                  </div>
+                  <span className="px-2 py-0.5 rounded-full bg-sky-500/10 text-sky-700 text-[10px] font-bold ring-1 ring-sky-500/20">
+                    {geoStats.manualPct}%
+                  </span>
+                </div>
+                <div className="space-y-1.5">
+                  <div className="flex justify-between text-xs font-bold text-slate-700">
+                    <span>Leads Manuales</span>
+                    <span className="font-mono text-sky-700">{geoStats.manualCount}</span>
+                  </div>
+                  <div className="w-full h-2 rounded-full bg-slate-100 overflow-hidden">
+                    <div className="h-full bg-gradient-to-r from-sky-500 to-sky-600 rounded-full animate-bar-fill" style={{ '--bar-width': `${geoStats.manualPct}%`, width: `${geoStats.manualPct}%` } as React.CSSProperties} />
+                  </div>
+                </div>
+                <div className="text-[10px] pt-1.5 border-t border-slate-100/50">
+                  <span className="text-slate-400 font-bold uppercase">Top servicio: </span>
+                  <span className="font-semibold text-slate-700">{geoStats.topManualService}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Geo: Solo si hay ciudades identificadas realmente */}
+            {(geoStats.quitoCount > 0 || geoStats.gyeCount > 0) && (
+              <div className="pt-3 border-t border-slate-100/60 space-y-2">
+                <p className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                  <MapPin className="w-3 h-3 text-slate-400" />
+                  Ciudades identificadas en notas ({geoStats.quitoCount + geoStats.gyeCount} de {geoStats.totalLeads})
+                </p>
+                <div className="flex items-center gap-3 text-xs">
+                  {geoStats.quitoCount > 0 && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-bold ring-1 ring-indigo-200/60">
+                      <span className="w-2 h-2 rounded-full bg-indigo-500" />
+                      Quito: {geoStats.quitoCount} ({geoStats.quitoPct}%)
+                    </span>
+                  )}
+                  {geoStats.gyeCount > 0 && (
+                    <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-sky-50 text-sky-700 font-bold ring-1 ring-sky-200/60">
+                      <span className="w-2 h-2 rounded-full bg-sky-500" />
+                      Guayaquil: {geoStats.gyeCount} ({geoStats.gyePct}%)
+                    </span>
+                  )}
+                  {geoStats.otherCount > 0 && (
+                    <span className="text-[11px] text-slate-400 font-medium">
+                      {geoStats.otherCount} sin ciudad identificada
+                    </span>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Nota: cuando no hay ciudades detectadas */}
+            {geoStats.quitoCount === 0 && geoStats.gyeCount === 0 && (
+              <div className="pt-3 border-t border-slate-100/60">
+                <p className="text-[10px] text-slate-400 italic">
+                  💡 Las ciudades se identificarán automáticamente cuando los leads incluyan ubicación en sus notas o conversaciones.
+                  Los anuncios CTWA actuales están segmentados a Guayaquil y Costa de Ecuador.
+                </p>
+              </div>
+            )}
+          </div>
         </div>
       )}
 
