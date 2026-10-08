@@ -20,6 +20,8 @@ import {
   ChevronDown,
   RotateCcw
 } from 'lucide-react';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../lib/firebase';
 import { Lead, MetaLiveTelemetry } from '../types';
 
 interface MetaAdsIntelligenceProps {
@@ -147,6 +149,44 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
     }
   };
 
+  // 1. Escuchar telemetría en tiempo real desde Cloud Firestore (Funciona 100% en Producción, Celulares y Web)
+  useEffect(() => {
+    try {
+      const telemetryDoc = doc(db, 'settings', 'meta_telemetry');
+      const unsubscribe = onSnapshot(
+        telemetryDoc,
+        (snap) => {
+          if (snap.exists()) {
+            const data = snap.data();
+            if (data?.telemetryJson) {
+              try {
+                const parsed: MetaLiveTelemetry = JSON.parse(data.telemetryJson);
+                if (parsed?.campaign && Array.isArray(parsed?.platforms)) {
+                  setTelemetry(parsed);
+                  setTotalAdSpend(parsed.campaign.spend);
+                  try {
+                    localStorage.setItem('kindev_meta_telemetry_cache', JSON.stringify(parsed));
+                  } catch {
+                    // ignore
+                  }
+                }
+              } catch {
+                // ignore
+              }
+            }
+          }
+        },
+        () => {
+          // Fallback silencioso si no hay conexión
+        }
+      );
+      return () => unsubscribe();
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // 2. Consulta adicional al servidor local si está disponible
   useEffect(() => {
     fetchLiveInsights();
   }, []);
