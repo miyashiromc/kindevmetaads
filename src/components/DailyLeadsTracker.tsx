@@ -75,7 +75,16 @@ export const DailyLeadsTracker: React.FC<DailyLeadsTrackerProps> = ({
   const difference = todayCount - yesterdayCount;
 
   // Desplazamiento de semana: 0 = en curso, -1 = semana anterior, -2 = hace 2 semanas, etc.
-  const [weekOffset, setWeekOffset] = useState<number>(0);
+  const [weekOffset, setWeekOffset] = useState<number>(() => {
+    try {
+      const saved = localStorage.getItem('kindev_active_week_offset');
+      if (saved !== null && saved !== 'all') {
+        const num = Number(saved);
+        if (!isNaN(num)) return num;
+      }
+    } catch {}
+    return 0;
+  });
 
   // Semanas disponibles para el desplegable (semana actual y hasta 8 anteriores)
   const availableWeeks = useMemo(() => {
@@ -170,9 +179,29 @@ export const DailyLeadsTracker: React.FC<DailyLeadsTrackerProps> = ({
     };
   }, [today, todayKey, yesterdayKey, leadsByDay, selectedFilter, weekOffset]);
 
+  // Escuchar sincronización de semana desde Horas Doradas u otros componentes
+  React.useEffect(() => {
+    const handleSync = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (typeof custom.detail === 'number' && custom.detail !== weekOffset) {
+        setWeekOffset(custom.detail);
+        const targetWeek = availableWeeks.find((w) => w.offset === custom.detail);
+        if (targetWeek) {
+          onSelectFilter(`week:${targetWeek.startKey}:${targetWeek.endKey}`);
+        }
+      }
+    };
+    window.addEventListener('kindev_week_sync', handleSync);
+    return () => window.removeEventListener('kindev_week_sync', handleSync);
+  }, [weekOffset, availableWeeks, onSelectFilter]);
+
   // Cambiar offset de semana y activar automáticamente el filtro de esa semana para ver sus leads
   const handleSelectWeekOffset = (newOffset: number) => {
     setWeekOffset(newOffset);
+    try {
+      localStorage.setItem('kindev_active_week_offset', String(newOffset));
+      window.dispatchEvent(new CustomEvent('kindev_week_sync', { detail: newOffset }));
+    } catch {}
     const targetWeek = availableWeeks.find((w) => w.offset === newOffset);
     if (targetWeek) {
       onSelectFilter(`week:${targetWeek.startKey}:${targetWeek.endKey}`);

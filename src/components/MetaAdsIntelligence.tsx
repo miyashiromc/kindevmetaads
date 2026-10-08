@@ -20,7 +20,11 @@ import {
   Radio,
   TrendingUp,
   Zap,
-  Eye
+  Eye,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  RotateCcw
 } from 'lucide-react';
 import { Lead, MetaLiveTelemetry } from '../types';
 
@@ -178,17 +182,103 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
     return `Hace ${days} d`;
   };
 
+  // ─── Control y Sincronización de Semanas con Ritmo Semanal ───
+  const [weekOffset, setWeekOffset] = useState<number | 'all'>(() => {
+    try {
+      const saved = localStorage.getItem('kindev_active_week_offset');
+      if (saved === 'all') return 'all';
+      if (saved !== null) {
+        const num = Number(saved);
+        if (!isNaN(num)) return num;
+      }
+    } catch {}
+    return 0; // Por defecto: semana actual (coincide 1:1 con Ritmo Semanal en el Kanban)
+  });
+
+  // Semanas disponibles idénticas a las del Kanban
+  const availableWeeks = useMemo(() => {
+    const today = new Date();
+    // Normalizar a hora de Ecuador para calcular los lunes exactos
+    const ecNow = new Date(today.toLocaleString('en-US', { timeZone: 'America/Guayaquil' }));
+    const baseMonday = new Date(ecNow);
+    const dayOfWeek = baseMonday.getDay();
+    const diffToMonday = (dayOfWeek === 0 ? -6 : 1) - dayOfWeek;
+    baseMonday.setDate(baseMonday.getDate() + diffToMonday);
+    baseMonday.setHours(0, 0, 0, 0);
+
+    return [0, -1, -2, -3, -4, -5, -6, -7].map((offset) => {
+      const mon = new Date(baseMonday);
+      mon.setDate(baseMonday.getDate() + offset * 7);
+      const sun = new Date(mon);
+      sun.setDate(mon.getDate() + 6);
+      sun.setHours(23, 59, 59, 999);
+
+      const monStr = `${mon.getDate()} ${mon.toLocaleDateString('es-EC', { month: 'short' })}`;
+      const sunStr = `${sun.getDate()} ${sun.toLocaleDateString('es-EC', { month: 'short' })}`;
+
+      let label = `${monStr} - ${sunStr}`;
+      if (offset === 0) label = `Semana actual (${label})`;
+      else if (offset === -1) label = `Semana anterior (${label})`;
+      else label = `Hace ${Math.abs(offset)} semanas (${label})`;
+
+      return {
+        offset,
+        label,
+        mon,
+        sun,
+        rangeText: `${monStr} - ${sunStr}`
+      };
+    });
+  }, []);
+
+  // Escuchar eventos de sincronización globales desde Kanban / Ritmo Semanal
+  useEffect(() => {
+    const handleSync = (e: Event) => {
+      const custom = e as CustomEvent;
+      if (custom.detail !== undefined && custom.detail !== weekOffset) {
+        setWeekOffset(custom.detail);
+      }
+    };
+    window.addEventListener('kindev_week_sync', handleSync);
+    return () => window.removeEventListener('kindev_week_sync', handleSync);
+  }, [weekOffset]);
+
+  const handleSelectWeekOffset = (newOffset: number | 'all') => {
+    setWeekOffset(newOffset);
+    try {
+      localStorage.setItem('kindev_active_week_offset', String(newOffset));
+      window.dispatchEvent(new CustomEvent('kindev_week_sync', { detail: newOffset }));
+    } catch {}
+  };
+
+  const selectedWeekObj = useMemo(() => {
+    if (weekOffset === 'all') return null;
+    return availableWeeks.find((w) => w.offset === weekOffset) || availableWeeks[0];
+  }, [weekOffset, availableWeeks]);
+
+  const leadsForHeatmap = useMemo(() => {
+    if (weekOffset === 'all' || !selectedWeekObj) return leads;
+    return leads.filter((l) => {
+      if (!l.createdAt) return false;
+      const ecDate = new Date(new Date(l.createdAt).toLocaleString('en-US', { timeZone: 'America/Guayaquil' }));
+      return ecDate.getTime() >= selectedWeekObj.mon.getTime() && ecDate.getTime() <= selectedWeekObj.sun.getTime();
+    });
+  }, [leads, weekOffset, selectedWeekObj]);
+
   // ─── 1. HORAS DORADAS DE WHATSAPP 100% REAL ───
-  // Analiza los timestamps reales de entrada de cada lead en Firestore
-  const { heatMapSlots, goldenHourInsight, peakDetails } = useMemo(() => {
+  // Analiza los timestamps reales de entrada de cada lead en Firestore para el periodo seleccionado
+  const { heatMapSlots, goldenHourInsight, peakDetails, dayTotals, totalSlotLeads } = useMemo(() => {
     const slotsConfig = [
+      { key: '06_08', label: '06:00 - 08:00', minH: 6, maxH: 8 },
       { key: '08_10', label: '08:00 - 10:00', minH: 8, maxH: 10 },
       { key: '10_12', label: '10:00 - 12:00', minH: 10, maxH: 12 },
       { key: '12_14', label: '12:00 - 14:00', minH: 12, maxH: 14 },
       { key: '14_16', label: '14:00 - 16:00', minH: 14, maxH: 16 },
       { key: '16_18', label: '16:00 - 18:00', minH: 16, maxH: 18 },
       { key: '18_20', label: '18:00 - 20:00', minH: 18, maxH: 20 },
-      { key: '20_22', label: '20:00 - 22:00', minH: 20, maxH: 22 }
+      { key: '20_22', label: '20:00 - 22:00', minH: 20, maxH: 22 },
+      { key: '22_24', label: '22:00 - 24:00', minH: 22, maxH: 24 },
+      { key: '00_06', label: '00:00 - 06:00', minH: 0, maxH: 6 }
     ];
 
     const counts: Record<string, number[]> = {};
@@ -204,13 +294,17 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
     let peakDayIdx = 0;
     let totalTimeStamped = 0;
 
-    leads.forEach((l) => {
+    leadsForHeatmap.forEach((l) => {
       if (!l.createdAt) return;
       const d = new Date(l.createdAt);
       if (isNaN(d.getTime())) return;
 
-      const hour = d.getHours();
-      const dayIdx = (d.getDay() + 6) % 7; // 0 = Lun, 6 = Dom
+      // Normalización estricta a zona horaria comercial de Ecuador (America/Guayaquil, UTC-5)
+      const ecString = d.toLocaleString('en-US', { timeZone: 'America/Guayaquil' });
+      const ecDate = new Date(ecString);
+
+      const hour = ecDate.getHours();
+      const dayIdx = (ecDate.getDay() + 6) % 7; // 0 = Lun, 6 = Dom
 
       const slot = slotsConfig.find((s) => hour >= s.minH && hour < s.maxH);
       if (slot) {
@@ -248,23 +342,40 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
       };
     });
 
+    // Totales diarios (suma vertical de cada día)
+    const dayTotals = [0, 0, 0, 0, 0, 0, 0];
+    slots.forEach((s) => {
+      dayTotals[0] += s.lun;
+      dayTotals[1] += s.mar;
+      dayTotals[2] += s.mie;
+      dayTotals[3] += s.jue;
+      dayTotals[4] += s.vie;
+      dayTotals[5] += s.sab;
+      dayTotals[6] += s.dom;
+    });
+
+    const totalSlotLeads = dayTotals.reduce((a, b) => a + b, 0);
+
     const peakSlotObj = slotsConfig.find((s) => s.key === peakSlotKey);
+    const scopeLabel = weekOffset === 'all' ? 'Histórico' : (weekOffset === 0 ? 'Esta Semana' : 'Semana Seleccionada');
     const insightText = maxCellCount > 0
-      ? `Pico Real: ${dayNames[peakDayIdx]} (${peakSlotObj?.label}) • ${maxCellCount} contactos`
-      : 'Acumulando primeros registros...';
+      ? `Pico (${scopeLabel}): ${dayNames[peakDayIdx]} (${peakSlotObj?.label}) • ${maxCellCount} contactos`
+      : 'Sin mensajes registrados en este periodo';
 
     return { 
       heatMapSlots: slots, 
       goldenHourInsight: insightText,
+      dayTotals,
+      totalSlotLeads,
       peakDetails: {
         hasData: maxCellCount > 0,
         dayName: dayNames[peakDayIdx],
-        timeRange: peakSlotObj?.label || '10:00 - 12:00',
+        timeRange: peakSlotObj?.label || '14:00 - 16:00',
         count: maxCellCount,
         totalTimeStamped
       }
     };
-  }, [leads]);
+  }, [leadsForHeatmap, weekOffset]);
 
   // ─── 2. FEED DE ACTIVIDAD 100% REAL DE METAEVENTS Y CRM ───
   const liveEvents = useMemo(() => {
@@ -860,7 +971,7 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
       {activeSubTab === 'mapa_ciudades' && (
         <div className="space-y-4 sm:space-y-5 stagger-children">
           
-          {/* ─── Heatmap Horario ─── */}
+          {/* ─── Heatmap Horario Sincronizado con Ritmo Semanal ─── */}
           <div className="glass-card rounded-2xl sm:rounded-3xl border border-slate-200/60 shadow-sm p-5 sm:p-6 space-y-4 animate-slide-up">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100/80 pb-4">
               <div className="flex items-center gap-3">
@@ -868,34 +979,128 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
                   <Clock className="w-4 h-4" />
                 </div>
                 <div>
-                  <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
-                    Horas Doradas de WhatsApp
-                  </h3>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-sm sm:text-base font-black text-slate-900 tracking-tight">
+                      Horas Doradas de WhatsApp
+                    </h3>
+                    {selectedWeekObj ? (
+                      <span className="text-[11px] font-semibold text-violet-700 bg-violet-50 px-2 py-0.5 rounded-md border border-violet-200/60 font-mono">
+                        ({selectedWeekObj.rangeText})
+                      </span>
+                    ) : (
+                      <span className="text-[11px] font-semibold text-amber-700 bg-amber-50 px-2 py-0.5 rounded-md border border-amber-200/60">
+                        Histórico Global
+                      </span>
+                    )}
+                  </div>
                   <p className="text-[11px] text-slate-500 mt-0.5">
-                    Intensidad real de mensajes por franja horaria ({leads.length} prospectos reales analizados)
+                    {weekOffset === 'all'
+                      ? `Intensidad acumulada de ${totalSlotLeads} prospectos reales de todas las semanas`
+                      : `Intensidad en tiempo real de ${totalSlotLeads} prospectos sincronizados con el Ritmo Semanal`}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 text-xs font-bold text-amber-700 bg-amber-500/10 px-3 py-1.5 rounded-xl ring-1 ring-amber-500/20 self-start sm:self-auto">
-                <Flame className="w-3.5 h-3.5" />
-                <span>{goldenHourInsight}</span>
+              {/* Controles de Navegación Idénticos al Ritmo Semanal de Kanban */}
+              <div className="flex items-center gap-1.5 flex-wrap self-start sm:self-auto">
+                {/* Botón rápido Anterior / Actual */}
+                {weekOffset === 0 ? (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectWeekOffset(-1)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200/80 transition-all active:scale-95 shadow-xs"
+                    title="Ver mapa de calor de la semana anterior"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
+                    <span>Semana anterior</span>
+                  </button>
+                ) : weekOffset !== 'all' ? (
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => handleSelectWeekOffset((weekOffset as number) - 1)}
+                      className="inline-flex items-center justify-center p-1 rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all active:scale-95"
+                      title="Semana previa anterior"
+                    >
+                      <ChevronLeft className="w-3.5 h-3.5" />
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleSelectWeekOffset(0)}
+                      className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 transition-all active:scale-95 shadow-xs"
+                      title="Volver a la semana actual en curso"
+                    >
+                      <span>Sem. Actual</span>
+                      <RotateCcw className="w-3 h-3" />
+                    </button>
+                    {(weekOffset as number) < -1 && (
+                      <button
+                        type="button"
+                        onClick={() => handleSelectWeekOffset((weekOffset as number) + 1)}
+                        className="inline-flex items-center justify-center p-1 rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all active:scale-95"
+                        title="Semana siguiente"
+                      >
+                        <ChevronRight className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => handleSelectWeekOffset(0)}
+                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 transition-all active:scale-95 shadow-xs"
+                    title="Ver semana actual"
+                  >
+                    <Calendar className="w-3.5 h-3.5" />
+                    <span>Sem. Actual</span>
+                  </button>
+                )}
+
+                {/* Desplegable de selección de semana / histórico */}
+                <select
+                  value={weekOffset}
+                  onChange={(e) => handleSelectWeekOffset(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                  className="text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-lg px-2 py-1 text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-violet-500 max-w-[155px] sm:max-w-none truncate"
+                  title="Seleccionar semana a analizar"
+                >
+                  <option value="0">Semana actual ({availableWeeks[0]?.rangeText})</option>
+                  {availableWeeks.slice(1).map((w) => (
+                    <option key={w.offset} value={w.offset}>
+                      {w.label}
+                    </option>
+                  ))}
+                  <option value="all">Histórico Total ({leads.length} leads acumulados)</option>
+                </select>
+
+                {/* Badge total de leads */}
+                <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-full bg-violet-50 text-violet-700 border border-violet-200/60 flex items-center gap-1">
+                  <span>{totalSlotLeads} leads</span>
+                  <span className="text-[10px] text-violet-500 font-sans font-medium hidden sm:inline">
+                    {weekOffset === 'all' ? 'totales' : 'esta sem'}
+                  </span>
+                </span>
               </div>
             </div>
 
-            {/* Banner de Uso Correcto de Horas Doradas */}
-            <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/15 flex items-start gap-3">
-              <div className="p-2 rounded-xl bg-amber-500/10 text-amber-700 shrink-0 mt-0.5">
-                <Flame className="w-4 h-4" />
+            {/* Banner de Uso Correcto de Horas Doradas con Pico detectado */}
+            <div className="p-3.5 rounded-2xl bg-amber-500/5 border border-amber-500/15 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="flex items-start gap-3">
+                <div className="p-2 rounded-xl bg-amber-500/10 text-amber-700 shrink-0 mt-0.5">
+                  <Flame className="w-4 h-4" />
+                </div>
+                <div className="space-y-1 text-xs">
+                  <h4 className="font-bold text-slate-900">
+                    ¿Cómo sacarle el máximo provecho comercial a tus Horas Doradas?
+                  </h4>
+                  <p className="text-slate-600 leading-relaxed text-[11px]">
+                    Las <strong>Horas Doradas</strong> te indican el momento exacto en que tus clientes potenciales están más activos y receptivos en WhatsApp. 
+                    Responde en <strong>menos de 3 minutos</strong> durante los picos detectados ({peakDetails.timeRange}) para evitar el abandono de chat y triplicar tu tasa de conversión a ventas cerradas.
+                  </p>
+                </div>
               </div>
-              <div className="space-y-1 text-xs">
-                <h4 className="font-bold text-slate-900">
-                  ¿Cómo sacarle el máximo provecho comercial a tus Horas Doradas?
-                </h4>
-                <p className="text-slate-600 leading-relaxed text-[11px]">
-                  Las <strong>Horas Doradas</strong> te indican el momento exacto en que tus clientes potenciales están más activos y receptivos en WhatsApp. 
-                  Responde en <strong>menos de 3 minutos</strong> durante los picos detectados ({peakDetails.timeRange}) para evitar el abandono de chat y triplicar tu tasa de conversión a ventas cerradas.
-                </p>
+              <div className="flex items-center gap-2 text-xs font-bold text-amber-700 bg-amber-500/10 px-3 py-1.5 rounded-xl ring-1 ring-amber-500/20 shrink-0 self-start sm:self-center">
+                <Flame className="w-3.5 h-3.5" />
+                <span>{goldenHourInsight}</span>
               </div>
             </div>
 
@@ -938,6 +1143,25 @@ export const MetaAdsIntelligence: React.FC<MetaAdsIntelligenceProps> = ({ leads 
                     </tr>
                   ))}
                 </tbody>
+                {/* ─── Fila Resumen: Total Diario Sincronizado 1:1 con Ritmo Semanal ─── */}
+                <tfoot className="border-t-2 border-slate-200 bg-slate-50/80 font-mono text-[11px]">
+                  <tr>
+                    <td className="py-2.5 text-left font-bold text-slate-800 font-sans text-[11px] pl-1 whitespace-nowrap">
+                      Total Diario
+                    </td>
+                    {dayTotals.map((tot, idx) => (
+                      <td key={idx} className="py-2.5 px-1.5">
+                        <span className={`inline-block w-7 h-7 leading-7 rounded-lg font-black transition-all ${
+                          tot > 0 
+                            ? 'bg-slate-900 text-white shadow-xs' 
+                            : 'text-slate-300 font-normal'
+                        }`}>
+                          {tot}
+                        </span>
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
               </table>
             </div>
 

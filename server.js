@@ -257,13 +257,20 @@ function scheduleSaveOutboundTracker() {
 function isPhoneOutboundTracked(phone, remoteJid = '') {
   if (!phone && !remoteJid) return false;
   const cleanPh = cleanPhone(phone);
+  // Si ya es un lead activo en Firestore, NUNCA debe ser tratado como prospecto de script bloqueado
+  if (cleanPh && existingFirestoreLeadsByPhone.has(cleanPh)) return false;
+  if (phone && existingFirestoreLeadsByPhone.has(phone)) return false;
+
   if (cleanPh && outboundPhonesMap.has(cleanPh)) return true;
   if (phone && outboundPhonesMap.has(phone)) return true;
 
   if (remoteJid) {
     const rawUser = remoteJid.split('@')[0].split(':')[0];
-    if (outboundPhonesMap.has(rawUser)) return true;
+    if (rawUser && existingFirestoreLeadsByPhone.has(rawUser)) return false;
     const cleanJid = cleanPhone(rawUser);
+    if (cleanJid && existingFirestoreLeadsByPhone.has(cleanJid)) return false;
+
+    if (outboundPhonesMap.has(rawUser)) return true;
     if (cleanJid && outboundPhonesMap.has(cleanJid)) return true;
 
     // Si es LID, verificar mapeo inverso en auth_baileys
@@ -272,6 +279,7 @@ function isPhoneOutboundTracked(phone, remoteJid = '') {
       if (fs.existsSync(reverseFile)) {
         try {
           const realPn = cleanPhone(JSON.parse(fs.readFileSync(reverseFile, 'utf8')));
+          if (realPn && existingFirestoreLeadsByPhone.has(realPn)) return false;
           if (realPn && (outboundPhonesMap.has(realPn) || outboundPhonesMap.has(rawUser))) return true;
         } catch (e) {}
       }
@@ -550,7 +558,7 @@ async function processIncomingMessage(sock, msg, contextSource = 'live') {
   if (!msg) return { saved: false, reason: 'no_msg' };
   addToRecentMessagesBuffer(msg);
 
-  // 1. Mensajes salientes: registrar automáticamente en Outbound Tracker (sea de script o manual)
+  // 1. Mensajes salientes: registrar automáticamente en Outbound Tracker SOLO si es prospección fría (no cliente ni conversación existente)
   if (msg.key?.fromMe) {
     const remoteJid = msg.key.remoteJid || '';
     if (remoteJid && !remoteJid.endsWith('@g.us') && !remoteJid.includes('status')) {
@@ -560,17 +568,34 @@ async function processIncomingMessage(sock, msg, contextSource = 'live') {
         msg.message?.conversation ||
         msg.message?.extendedTextMessage?.text ||
         '';
-      recordOutboundMessage(rawUser, text);
-      if (clean) recordOutboundMessage(clean, text);
 
+      let mappedPhone = '';
       if (remoteJid.endsWith('@lid')) {
         const reverseFile = path.join(AUTH_DIR, `lid-mapping-${rawUser}_reverse.json`);
         if (fs.existsSync(reverseFile)) {
           try {
-            const realPhone = cleanPhone(JSON.parse(fs.readFileSync(reverseFile, 'utf8')));
-            if (realPhone) recordOutboundMessage(realPhone, text);
+            mappedPhone = cleanPhone(JSON.parse(fs.readFileSync(reverseFile, 'utf8')));
           } catch (e) {}
         }
+      }
+
+      const isKnownLead = (clean && existingFirestoreLeadsByPhone.has(clean)) ||
+                          (rawUser && existingFirestoreLeadsByPhone.has(rawUser)) ||
+                          (mappedPhone && existingFirestoreLeadsByPhone.has(mappedPhone));
+
+      const hasInboundMessage = recentMessagesBuffer.some(m =>
+        !m.key?.fromMe && (
+          m.key?.remoteJid === remoteJid ||
+          (clean && m.key?.remoteJid?.includes(clean)) ||
+          (mappedPhone && m.key?.remoteJid?.includes(mappedPhone))
+        )
+      );
+
+      // Si NO es un lead conocido y NO es una respuesta a un cliente entrante, es outbound frío
+      if (!isKnownLead && !hasInboundMessage) {
+        recordOutboundMessage(rawUser, text);
+        if (clean) recordOutboundMessage(clean, text);
+        if (mappedPhone) recordOutboundMessage(mappedPhone, text);
       }
     }
     return { saved: false, reason: 'from_me' };
@@ -620,21 +645,38 @@ async function processIncomingMessage(sock, msg, contextSource = 'live') {
   inFlightPhones.add(cleanPh);
 
   try {
-    // 8. Extraer contenido textual o multimedia del mensaje
+    // 8. Extraer contenido textual o multimedia del mensaje (desempaquetando capas)
+    let innerMessage = msg.message;
+    while (
+      innerMessage?.ephemeralMessage?.message ||
+      innerMessage?.viewOnceMessage?.message ||
+      innerMessage?.viewOnceMessageV2?.message ||
+      innerMessage?.documentWithCaptionMessage?.message
+    ) {
+      innerMessage =
+        innerMessage.ephemeralMessage?.message ||
+        innerMessage.viewOnceMessage?.message ||
+        innerMessage.viewOnceMessageV2?.message ||
+        innerMessage.documentWithCaptionMessage?.message;
+    }
+
     const pushName = msg.pushName || 'Cliente WhatsApp';
     let text =
-      msg.message?.conversation ||
-      msg.message?.extendedTextMessage?.text ||
-      msg.message?.imageMessage?.caption ||
-      msg.message?.videoMessage?.caption ||
-      msg.message?.documentMessage?.caption ||
-      msg.message?.buttonsResponseMessage?.selectedDisplayText ||
-      msg.message?.listResponseMessage?.title ||
-      msg.message?.templateButtonReplyMessage?.selectedId ||
+      innerMessage?.conversation ||
+      innerMessage?.extendedTextMessage?.text ||
+      innerMessage?.imageMessage?.caption ||
+      innerMessage?.videoMessage?.caption ||
+      innerMessage?.documentMessage?.caption ||
+      innerMessage?.buttonsResponseMessage?.selectedDisplayText ||
+      innerMessage?.buttonsResponseMessage?.selectedButtonId ||
+      innerMessage?.listResponseMessage?.title ||
+      innerMessage?.templateButtonReplyMessage?.selectedDisplayText ||
+      innerMessage?.templateButtonReplyMessage?.selectedId ||
+      innerMessage?.interactiveResponseMessage?.body?.text ||
       '';
 
-    const isAudio = !!(msg.message?.audioMessage);
-    const isMedia = !!(msg.message?.imageMessage || msg.message?.videoMessage || msg.message?.documentMessage);
+    const isAudio = !!(innerMessage?.audioMessage);
+    const isMedia = !!(innerMessage?.imageMessage || innerMessage?.videoMessage || innerMessage?.documentMessage || innerMessage?.stickerMessage);
 
     if (!text) {
       if (isAudio) text = '[Nota de voz / Audio recibido]';
@@ -643,15 +685,17 @@ async function processIncomingMessage(sock, msg, contextSource = 'live') {
 
     // 9. Detección real de Anuncio Meta Ads (CTWA)
     const hasMetaAdReferral = !!(
-      msg.message?.extendedTextMessage?.contextInfo?.externalAdReply ||
-      msg.message?.extendedTextMessage?.contextInfo?.advertisementDetails ||
-      msg.message?.extendedTextMessage?.contextInfo?.referral ||
-      msg.message?.templateButtonReplyMessage
+      innerMessage?.extendedTextMessage?.contextInfo?.externalAdReply ||
+      innerMessage?.extendedTextMessage?.contextInfo?.advertisementDetails ||
+      innerMessage?.extendedTextMessage?.contextInfo?.referral ||
+      innerMessage?.templateButtonReplyMessage ||
+      innerMessage?.buttonsResponseMessage
     );
 
     // 10. Descarte de paquetes vacíos (sin texto, sin audio, sin medios y sin referencia publicitaria)
     if (!text.trim() && !isAudio && !isMedia && !hasMetaAdReferral) {
-      if (msgId) markMessageIdProcessed(msgId);
+      // OJO CRÍTICO: NUNCA marcar msgId como procesado en un paquete vacío/handshake,
+      // para permitir que el paquete subsiguiente con el payload real con el mismo ID sea procesado.
       return { saved: false, reason: 'empty_ping_no_substance' };
     }
 
@@ -659,8 +703,24 @@ async function processIncomingMessage(sock, msg, contextSource = 'live') {
     const isOutboundTarget = isPhoneOutboundTracked(cleanPh, remoteJid);
     const lowerText = text.toLowerCase().trim();
 
-    // === REGLA ESTRICTA: NINGÚN CONTACTO DEL SCRIPT (OUTBOUND) SE AGREGA A FIRESTORE NI A CAPI ===
-    if (isOutboundTarget) {
+    // Detección de conversión comercial o clic en Anuncio de Meta Ads
+    const isAdConversion = hasMetaAdReferral || 
+      lowerText.includes('quiero hablar con un asesor') || 
+      lowerText.includes('asesor') || 
+      lowerText.includes('cotizar') || 
+      lowerText.includes('precio') || 
+      lowerText.includes('informacion') || 
+      lowerText.includes('información');
+
+    if (isOutboundTarget && isAdConversion) {
+      console.log(`🎯 [Conversión de Anuncio Detectada!] Contacto previamente en outbound ${pushName} (${displayPhone}) interactuó con anuncio: "${text}". Removiendo de lista de exclusión.`);
+      outboundPhonesMap.delete(cleanPh);
+      if (remoteJid) outboundPhonesMap.delete(remoteJid.split('@')[0]);
+      scheduleSaveOutboundTracker();
+    }
+
+    // === REGLA ESTRICTA: NINGÚN CONTACTO DEL SCRIPT (OUTBOUND) SE AGREGA A FIRESTORE NI A CAPI, EXCEPTO SI CONVIERTE POR ANUNCIO ===
+    if (isOutboundTarget && !isAdConversion) {
       console.log(`🛡️ [Outbound Script Bloqueado] Contacto de prospección ${pushName} (${displayPhone}): "${text}". Omitido rotundamente para no ensuciar el CRM.`);
       if (msgId) markMessageIdProcessed(msgId);
 
@@ -905,6 +965,116 @@ app.get('/api/whatsapp/status', (req, res) => {
     updatedAt: new Date().toISOString()
   });
 });
+
+// Endpoint para enviar mensajes o documentos directos por WhatsApp (Baileys)
+app.post('/api/whatsapp/send', async (req, res) => {
+  const { phone, message, filePath, fileName, caption } = req.body || {};
+  if (!globalSock || connectionStatus !== 'connected') {
+    return res.status(503).json({ success: false, error: 'WhatsApp no está conectado actualmente en el servidor.' });
+  }
+
+  const cleanPh = cleanPhone(phone);
+  if (!cleanPh) {
+    return res.status(400).json({ success: false, error: 'Teléfono inválido o no proporcionado.' });
+  }
+
+  try {
+    let targetJid = `${cleanPh}@s.whatsapp.net`;
+    try {
+      const [checked] = await globalSock.onWhatsApp(targetJid);
+      if (checked?.exists && checked.jid) {
+        targetJid = checked.jid;
+      }
+    } catch (e) {
+      // Continuar con targetJid por defecto
+    }
+
+    let response;
+    if (filePath) {
+      if (!fs.existsSync(filePath)) {
+        return res.status(404).json({ success: false, error: `Archivo no encontrado en ruta: ${filePath}` });
+      }
+
+      const buffer = fs.readFileSync(filePath);
+      const isPdf = filePath.toLowerCase().endsWith('.pdf');
+      const isDocx = filePath.toLowerCase().endsWith('.docx');
+      const mimetype = isPdf
+        ? 'application/pdf'
+        : isDocx
+        ? 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+        : 'application/octet-stream';
+
+      response = await globalSock.sendMessage(targetJid, {
+        document: buffer,
+        mimetype,
+        fileName: fileName || path.basename(filePath),
+        caption: caption || ''
+      });
+    } else if (message) {
+      response = await globalSock.sendMessage(targetJid, { text: message });
+    } else {
+      return res.status(400).json({ success: false, error: 'Debe especificar "message" o "filePath".' });
+    }
+
+    return res.status(200).json({ success: true, targetJid, response });
+  } catch (err) {
+    console.error('⚠️ Error enviando mensaje/documento por WhatsApp:', err);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// Endpoint para consultar historial reciente de una conversación específica
+app.get('/api/whatsapp/chat/:phone', async (req, res) => {
+  const queryPhone = cleanPhone(req.params.phone) || req.params.phone;
+  const results = [];
+
+  for (const msg of recentMessagesBuffer) {
+    try {
+      const remoteJid = msg.key?.remoteJid || '';
+      let isMatch = remoteJid.includes(queryPhone);
+      
+      if (!isMatch && remoteJid.endsWith('@lid')) {
+        const lidUser = remoteJid.split('@')[0].split(':')[0];
+        const reverseFile = path.join(AUTH_DIR, `lid-mapping-${lidUser}_reverse.json`);
+        if (fs.existsSync(reverseFile)) {
+          const mapped = cleanPhone(JSON.parse(fs.readFileSync(reverseFile, 'utf8')));
+          if (mapped === queryPhone) isMatch = true;
+        }
+      }
+
+      if (isMatch) {
+        const text =
+          msg.message?.conversation ||
+          msg.message?.extendedTextMessage?.text ||
+          msg.message?.imageMessage?.caption ||
+          msg.message?.videoMessage?.caption ||
+          msg.message?.documentMessage?.caption ||
+          msg.message?.buttonsResponseMessage?.selectedDisplayText ||
+          msg.message?.listResponseMessage?.title ||
+          (msg.message?.audioMessage ? '[Audio]' : '') ||
+          '';
+
+        results.push({
+          id: msg.key?.id,
+          fromMe: Boolean(msg.key?.fromMe),
+          pushName: msg.pushName || (msg.key?.fromMe ? 'Kindev' : 'Cliente'),
+          timestamp: msg.messageTimestamp ? Number(msg.messageTimestamp) * 1000 : null,
+          text
+        });
+      }
+    } catch (e) {}
+  }
+
+  // Ordenar cronológicamente
+  results.sort((a, b) => (a.timestamp || 0) - (b.timestamp || 0));
+
+  res.json({
+    phone: queryPhone,
+    count: results.length,
+    messages: results
+  });
+});
+
 
 // Endpoint de sincronización retroactiva bajo demanda
 app.get('/api/whatsapp/sync-retroactive', async (req, res) => {
