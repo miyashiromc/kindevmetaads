@@ -9,6 +9,7 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
+  ChevronDown,
   RotateCcw
 } from 'lucide-react';
 import { Lead } from '../types';
@@ -384,99 +385,92 @@ export const DailyLeadsTracker: React.FC<DailyLeadsTrackerProps> = ({
         {/* ─── TARJETA 3: RITMO SEMANAL (Días de la semana con conteo diario y navegación) ─── */}
         <div className="md:col-span-6 bg-white rounded-2xl p-4 border border-slate-200/80 shadow-[0_1px_3px_rgba(0,0,0,0.02)] flex flex-col justify-between gap-2.5">
           
-          {/* Header de la semana */}
-          <div className="flex flex-wrap items-center justify-between gap-2 pb-2 border-b border-slate-100">
-            <div className="flex items-center gap-2">
+          {/* Header: Título + Badge total */}
+          <div className="flex items-center justify-between gap-2 pb-2 border-b border-slate-100">
+            <div className="flex items-center gap-2 min-w-0">
               <Calendar className="w-3.5 h-3.5 text-violet-600 shrink-0" />
               <span className="text-xs font-bold text-slate-900 tracking-tight">
                 Ritmo Semanal
               </span>
-              <span className="text-[11px] text-slate-500 font-medium hidden lg:inline">
+              <span className="text-[11px] text-slate-500 font-medium hidden sm:inline truncate">
                 ({weekData.monday.getDate()} {weekData.monday.toLocaleDateString('es-EC', { month: 'short' })} - {weekData.sunday.getDate()} {weekData.sunday.toLocaleDateString('es-EC', { month: 'short' })})
               </span>
             </div>
+            {/* Badge total leads de la semana */}
+            <button
+              type="button"
+              onClick={handleToggleWeek}
+              className={`text-[11px] font-mono font-bold px-2.5 py-1 rounded-full transition-all flex items-center gap-1 cursor-pointer border shrink-0 ${
+                weekData.isWeekSelected
+                  ? 'bg-violet-600 text-white border-violet-700 shadow-xs ring-2 ring-violet-500/20'
+                  : 'bg-violet-50 hover:bg-violet-100 text-violet-700 border-violet-200/60'
+              }`}
+              title={weekData.isWeekSelected ? 'Quitar filtro de semana' : 'Filtrar toda esta semana'}
+            >
+              <span>{weekData.totalWeek} {weekData.totalWeek === 1 ? 'lead' : 'leads'}</span>
+              {weekData.isWeekSelected && <CheckCircle2 className="w-3 h-3 text-white" />}
+            </button>
+          </div>
 
-            {/* Controles de navegación de semana: Botón rápido, desplegable y total */}
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {/* Botón único para ir a la Semana Anterior o Volver a Semana Actual */}
-              {weekOffset === 0 ? (
+          {/* Controles de navegación: Flechas + Select full-width en móvil */}
+          <div className="flex flex-col gap-2">
+            {/* Fila: Navegación rápida */}
+            <div className="flex items-center gap-1.5">
+              {/* Flecha izquierda */}
+              <button
+                type="button"
+                onClick={() => handleSelectWeekOffset(weekOffset - 1)}
+                className="inline-flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:px-2.5 sm:py-1.5 rounded-lg text-slate-600 hover:bg-violet-50 hover:text-violet-700 border border-slate-200/80 transition-all active:scale-95"
+                title="Semana anterior"
+              >
+                <ChevronLeft className="w-4 h-4 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+                <span className="hidden sm:inline text-[11px] font-bold ml-0.5">Anterior</span>
+              </button>
+
+              {/* Botón "Actual" (solo si no estamos en semana actual) */}
+              {weekOffset !== 0 && (
                 <button
                   type="button"
-                  onClick={() => handleSelectWeekOffset(-1)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200/80 transition-all active:scale-95 shadow-xs"
-                  title="Ver datos de la semana anterior"
+                  onClick={() => handleSelectWeekOffset(0)}
+                  className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 transition-all active:scale-95 shadow-xs"
+                  title="Volver a la semana actual"
                 >
-                  <ChevronLeft className="w-3.5 h-3.5 stroke-[2.5]" />
-                  <span>Semana anterior</span>
+                  <RotateCcw className="w-3 h-3" />
+                  <span>Actual</span>
                 </button>
-              ) : (
-                <div className="flex items-center gap-1">
-                  <button
-                    type="button"
-                    onClick={() => handleSelectWeekOffset(weekOffset - 1)}
-                    className="inline-flex items-center justify-center p-1 rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all active:scale-95"
-                    title="Semana previa anterior"
-                  >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => handleSelectWeekOffset(0)}
-                    className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold bg-emerald-50 hover:bg-emerald-100 text-emerald-700 border border-emerald-300 transition-all active:scale-95 shadow-xs"
-                    title="Regresar a la semana actual en vivo"
-                  >
-                    <span>Actual</span>
-                    <RotateCcw className="w-3 h-3" />
-                  </button>
-
-                  {weekOffset < -1 && (
-                    <button
-                      type="button"
-                      onClick={() => handleSelectWeekOffset(weekOffset + 1)}
-                      className="inline-flex items-center justify-center p-1 rounded-lg text-slate-600 hover:bg-slate-100 border border-slate-200 transition-all active:scale-95"
-                      title="Semana siguiente"
-                    >
-                      <ChevronRight className="w-3.5 h-3.5" />
-                    </button>
-                  )}
-                </div>
               )}
 
-              {/* Selector desplegable de semanas anteriores */}
+              {/* Flecha derecha (solo si no estamos en semana actual) */}
+              {weekOffset < 0 && (
+                <button
+                  type="button"
+                  onClick={() => handleSelectWeekOffset(weekOffset + 1)}
+                  className="inline-flex items-center justify-center w-8 h-8 sm:w-auto sm:h-auto sm:px-2.5 sm:py-1.5 rounded-lg text-slate-600 hover:bg-violet-50 hover:text-violet-700 border border-slate-200/80 transition-all active:scale-95"
+                  title="Semana siguiente"
+                >
+                  <span className="hidden sm:inline text-[11px] font-bold mr-0.5">Siguiente</span>
+                  <ChevronRight className="w-4 h-4 sm:w-3.5 sm:h-3.5 stroke-[2.5]" />
+                </button>
+              )}
+            </div>
+
+            {/* Fila: Select full-width en móvil */}
+            <div className="relative w-full sm:w-auto">
               <select
                 value={weekOffset}
                 onChange={(e) => handleSelectWeekOffset(Number(e.target.value))}
-                className="text-[11px] font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200/90 rounded-lg px-2 py-1 text-slate-700 cursor-pointer focus:outline-none focus:ring-1 focus:ring-violet-500 max-w-[145px] sm:max-w-none truncate"
-                title="Desplegar para ver semanas anteriores"
+                className="w-full sm:w-auto text-xs font-semibold bg-slate-50 hover:bg-slate-100 border border-slate-200 rounded-xl px-3 py-2.5 sm:py-1.5 text-slate-700 cursor-pointer focus:outline-none focus:ring-2 focus:ring-violet-500/30 focus:border-violet-400 appearance-none pr-8 transition-all"
+                title="Seleccionar semana a analizar"
               >
                 {availableWeeks.map((w) => (
                   <option key={w.offset} value={w.offset}>
-                    {w.label}
+                    {w.offset === 0 ? '📅 ' : '◀ '}{w.label}
                   </option>
                 ))}
               </select>
-
-              {/* Botón Badge Total de Leads de la Semana (Clic para filtrar toda la semana) */}
-              <button
-                type="button"
-                onClick={handleToggleWeek}
-                className={`text-xs font-mono font-bold px-2 py-0.5 rounded-full transition-all flex items-center gap-1 cursor-pointer border ${
-                  weekData.isWeekSelected
-                    ? 'bg-violet-600 text-white border-violet-700 shadow-xs ring-2 ring-violet-500/20'
-                    : 'bg-violet-50 hover:bg-violet-100 text-violet-700 border border-violet-200/60'
-                }`}
-                title={weekData.isWeekSelected ? 'Haz clic para quitar filtro de semana' : 'Haz clic para ver toda esta semana en el panel'}
-              >
-                <span>{weekData.totalWeek} {weekData.totalWeek === 1 ? 'lead' : 'leads'}</span>
-                {weekData.isWeekSelected ? (
-                  <CheckCircle2 className="w-3 h-3 text-white" />
-                ) : (
-                  <span className="text-[10px] text-violet-500 font-sans font-medium hidden sm:inline">
-                    {weekOffset === 0 ? 'esta sem' : 'esa sem'}
-                  </span>
-                )}
-              </button>
+              <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-2.5 text-slate-400">
+                <ChevronDown className="w-4 h-4" />
+              </div>
             </div>
           </div>
 
